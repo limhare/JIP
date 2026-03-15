@@ -7,13 +7,25 @@ publish_apk/
 .vs/
 *.user
 *.suo
+.idea/
+*.iml
 
 # OS
 Thumbs.db
 .DS_Store
+*.log
 
 # Archives
 *.zip
+
+# Android
+*.apk
+*.aab
+*.jks
+*.keystore
+*.hprof
+local.properties
+google-services.json
 
 # Native C++ build (third-party source + intermediate outputs)
 demucs_build/src/
