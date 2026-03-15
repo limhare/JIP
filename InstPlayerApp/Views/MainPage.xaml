@@ -1,0 +1,663 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:InstPlayerApp.ViewModels"
+             xmlns:models="clr-namespace:InstPlayerApp.Models"
+             x:Class="InstPlayerApp.Views.MainPage"
+             x:DataType="vm:MainViewModel"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#1E1E1E">
+
+    <Grid RowDefinitions="Auto,*,Auto" Padding="0">
+
+        <!-- ═══ TOP: Now Playing + Progress ═══ -->
+        <VerticalStackLayout Grid.Row="0" Padding="16,12">
+            <Grid>
+                <Label Text="{Binding NowPlayingText}"
+                       FontSize="18" FontAttributes="Bold"
+                       TextColor="#E1E1E1"
+                       HorizontalOptions="Center" VerticalOptions="Center" />
+                <Button HorizontalOptions="End" VerticalOptions="Center"
+                        Text="ⓘ" FontSize="13"
+                        BackgroundColor="Transparent" TextColor="#555"
+                        WidthRequest="36" HeightRequest="36" Padding="0"
+                        Clicked="OnShowCredits" />
+            </Grid>
+
+            <Grid ColumnDefinitions="50,*,50" Margin="0,8,0,0">
+                <Label Grid.Column="0" Text="{Binding CurrentTimeText}"
+                       TextColor="#999" FontSize="12" VerticalOptions="Center" />
+                <AbsoluteLayout Grid.Column="1">
+                    <BoxView Color="#FF8C00" Opacity="0.25" InputTransparent="True"
+                             IsVisible="{Binding IsAbRangeVisible}"
+                             AbsoluteLayout.LayoutFlags="None"
+                             AbsoluteLayout.LayoutBounds="{Binding AbRangeRect}" />
+                    <BoxView Color="#4A9EFF" Opacity="0.9" InputTransparent="True"
+                             IsVisible="{Binding IsPointASet}"
+                             AbsoluteLayout.LayoutFlags="None"
+                             AbsoluteLayout.LayoutBounds="{Binding AbLineARect}" />
+                    <BoxView Color="#FF8C00" Opacity="0.9" InputTransparent="True"
+                             IsVisible="{Binding IsPointBSet}"
+                             AbsoluteLayout.LayoutFlags="None"
+                             AbsoluteLayout.LayoutBounds="{Binding AbLineBRect}" />
+                    <Slider AbsoluteLayout.LayoutFlags="All" AbsoluteLayout.LayoutBounds="0,0,1,1"
+                            Minimum="0" Maximum="{Binding ProgressMax}"
+                            Value="{Binding ProgressValue}"
+                            ThumbColor="#4A9EFF" MinimumTrackColor="#4A9EFF" MaximumTrackColor="#444"
+                            DragCompleted="OnProgressDragCompleted"
+                            SizeChanged="OnProgressSliderSizeChanged" />
+                </AbsoluteLayout>
+                <Label Grid.Column="2" Text="{Binding TotalTimeText}"
+                       TextColor="#999" FontSize="12"
+                       HorizontalOptions="End" VerticalOptions="Center" />
+            </Grid>
+        </VerticalStackLayout>
+
+        <!-- ═══ CENTER: Tabbed Content (Playlist / Lyrics / YouTube) ═══ -->
+        <Grid Grid.Row="1">
+
+            <!-- ▼ NARROW LAYOUT - 2열: 왼쪽 Playlist 고정, 오른쪽 탭 전환 -->
+            <Grid IsVisible="{Binding IsNarrowLayout}" ColumnDefinitions="0.45*,0.55*">
+
+                <!-- 왼쪽: Playlist 항상 표시 -->
+                <Grid Grid.Column="0" RowDefinitions="Auto,Auto,*" Padding="8,0" BackgroundColor="#1E1E1E">
+                    <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto" Margin="0,0,0,8">
+                        <Label Text="Playlist" TextColor="#4EC9B0" FontSize="14" FontAttributes="Bold"
+                               VerticalOptions="Center" />
+                        <Button Grid.Column="1" Text="💾" FontSize="16"
+                                BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                                WidthRequest="44" HeightRequest="44" CornerRadius="22"
+                                Clicked="OnSavePlaylist" />
+                        <Button Grid.Column="2" Text="📂" FontSize="16"
+                                BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                                WidthRequest="44" HeightRequest="44" CornerRadius="22"
+                                Clicked="OnLoadPlaylist" />
+                        <Button Grid.Column="3" Text="🗑️" FontSize="16"
+                                BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                                WidthRequest="44" HeightRequest="44" CornerRadius="22"
+                                Command="{Binding RemoveSelectedTracksCommand}" />
+                        <Button Grid.Column="4" Text="🎸" FontSize="16"
+                                BackgroundColor="#2D2D30" TextColor="#FFB900"
+                                WidthRequest="44" HeightRequest="44" CornerRadius="22"
+                                Command="{Binding ExtractAccompanimentCommand}"
+                                IsEnabled="{Binding IsExtracting, Converter={StaticResource InvertBool}}" />
+                        <Button Grid.Column="5" Text="+" FontSize="20"
+                                BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                                WidthRequest="44" HeightRequest="44" CornerRadius="22"
+                                Clicked="OnAddFiles" />
+                    </Grid>
+                    <!-- 반주 추출 진행 표시 -->
+                    <Grid Grid.Row="1" IsVisible="{Binding IsExtracting}"
+                          ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" Padding="4,0,4,6">
+                        <Label Grid.Row="0" Grid.Column="0" Text="{Binding ExtractionStatusText}"
+                               TextColor="#FFB900" FontSize="11" />
+                        <Button Grid.Row="0" Grid.Column="1" Text="✕" FontSize="12"
+                                BackgroundColor="Transparent" TextColor="#E74C3C"
+                                WidthRequest="32" HeightRequest="24" Padding="0"
+                                Command="{Binding CancelExtractionCommand}" />
+                        <ProgressBar Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                                     Progress="{Binding ExtractionProgress, Converter={StaticResource DivideBy100}}"
+                                     ProgressColor="#FF8C00" />
+                    </Grid>
+                    <CollectionView x:Name="PlaylistViewNarrow" Grid.Row="2"
+                                    ItemsSource="{Binding Playlist}" SelectionMode="None"
+                                    CanReorderItems="True">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="models:PlaylistItem">
+                                <SwipeView>
+                                    <SwipeView.RightItems>
+                                        <SwipeItems>
+                                            <SwipeItem Text="Delete" BackgroundColor="#E74C3C"
+                                                       Invoked="OnSwipeDeleteTrack" />
+                                        </SwipeItems>
+                                    </SwipeView.RightItems>
+                                    <Grid Padding="12,10" Margin="0,2" ColumnDefinitions="*,Auto">
+                                        <Grid.Triggers>
+                                            <DataTrigger TargetType="Grid" Binding="{Binding IsSelected}" Value="True">
+                                                <Setter Property="BackgroundColor" Value="#1A3A5C" />
+                                            </DataTrigger>
+                                            <DataTrigger TargetType="Grid" Binding="{Binding IsSelected}" Value="False">
+                                                <Setter Property="BackgroundColor" Value="#2D2D30" />
+                                            </DataTrigger>
+                                        </Grid.Triggers>
+                                        <Grid.GestureRecognizers>
+                                            <TapGestureRecognizer Tapped="OnPlaylistItemTapped" NumberOfTapsRequired="1" />
+                                            <TapGestureRecognizer Tapped="OnPlaylistItemDoubleTapped" NumberOfTapsRequired="2" />
+                                        </Grid.GestureRecognizers>
+                                        <Label Grid.Column="0" Text="{Binding DisplayName}"
+                                               TextColor="#E1E1E1" FontSize="14" VerticalOptions="Center" />
+                                        <Label Grid.Column="1" Text="☰" TextColor="#666" FontSize="18"
+                                               VerticalOptions="Center" Padding="8,0,0,0" />
+                                    </Grid>
+                                </SwipeView>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </Grid>
+
+                <!-- 오른쪽: 탭 스위치 + Lyrics / YouTube -->
+                <Grid Grid.Column="1" RowDefinitions="Auto,*" BackgroundColor="#252526">
+                    <!-- 탭 스위치 -->
+                    <Grid Grid.Row="0" ColumnDefinitions="*,*" HeightRequest="40" BackgroundColor="#252526">
+                        <Button Grid.Column="0" Text="가사" FontSize="13"
+                                BackgroundColor="#2D2D30" TextColor="#666"
+                                HeightRequest="40" CornerRadius="0" Padding="0"
+                                Command="{Binding ShowLyricsTabCommand}">
+                            <Button.Triggers>
+                                <DataTrigger TargetType="Button" Binding="{Binding ShowLyrics}" Value="True">
+                                    <Setter Property="BackgroundColor" Value="#1A3A5C" />
+                                    <Setter Property="TextColor" Value="#4A9EFF" />
+                                    <Setter Property="FontAttributes" Value="Bold" />
+                                </DataTrigger>
+                            </Button.Triggers>
+                        </Button>
+                        <Button Grid.Column="1" Text="유튜브추출" FontSize="13"
+                                BackgroundColor="#2D2D30" TextColor="#666"
+                                HeightRequest="40" CornerRadius="0" Padding="0"
+                                Command="{Binding ShowYoutubeTabCommand}">
+                            <Button.Triggers>
+                                <DataTrigger TargetType="Button" Binding="{Binding ShowYoutube}" Value="True">
+                                    <Setter Property="BackgroundColor" Value="#1A3A5C" />
+                                    <Setter Property="TextColor" Value="#4A9EFF" />
+                                    <Setter Property="FontAttributes" Value="Bold" />
+                                </DataTrigger>
+                            </Button.Triggers>
+                        </Button>
+                    </Grid>
+                    <!-- Lyrics -->
+                    <Grid Grid.Row="1" IsVisible="{Binding ShowLyrics}" RowDefinitions="Auto,*" Padding="8,4">
+                        <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,Auto,*,Auto" Margin="0,0,0,8">
+                            <Button Grid.Column="0" Text="A-" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                                    WidthRequest="40" HeightRequest="36" FontSize="12"
+                                    Command="{Binding LyricsFontDownCommand}" />
+                            <Button Grid.Column="1" Text="A" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                                    WidthRequest="40" HeightRequest="36" FontSize="14" />
+                            <Button Grid.Column="2" Text="A+" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                                    WidthRequest="40" HeightRequest="36" FontSize="12"
+                                    Command="{Binding LyricsFontUpCommand}" />
+                            <Label Grid.Column="3" />
+                            <Button Grid.Column="4" Text="{Binding LyricsEditModeText}"
+                                    BackgroundColor="#2D2D30" TextColor="#4A9EFF"
+                                    HeightRequest="36" FontSize="12"
+                                    Command="{Binding ToggleLyricsEditCommand}"
+                                    Clicked="OnLyricsEditDone" />
+                        </Grid>
+                        <ScrollView Grid.Row="1">
+                            <Editor x:Name="LyricsEditorNarrow"
+                                    Text="{Binding LyricsText}"
+                                    FontSize="{Binding LyricsFontSize}"
+                                    TextColor="#E1E1E1" BackgroundColor="#252526"
+                                    IsReadOnly="{Binding LyricsEditMode, Converter={StaticResource InvertBool}}"
+                                    AutoSize="TextChanges" />
+                        </ScrollView>
+                    </Grid>
+                    <!-- YouTube Download -->
+                    <ScrollView Grid.Row="1" IsVisible="{Binding ShowYoutube}">
+                        <VerticalStackLayout Padding="16,8" Spacing="12">
+                            <Label Text="YouTube Download" TextColor="#4EC9B0" FontSize="16" FontAttributes="Bold" />
+                            <Label Text="YouTube URL" TextColor="#999" FontSize="12" />
+                            <Entry Text="{Binding YoutubeUrl}"
+                                   Placeholder="https://www.youtube.com/watch?v=..."
+                                   PlaceholderColor="#666" TextColor="#E1E1E1" BackgroundColor="#2D2D30"
+                                   FontSize="14" Keyboard="Url" />
+                            <Button Text="Download" BackgroundColor="#4A9EFF" TextColor="White"
+                                    FontSize="16" HeightRequest="48" CornerRadius="8"
+                                    Command="{Binding DownloadYoutubeCommand}"
+                                    IsEnabled="{Binding IsDownloading, Converter={StaticResource InvertBool}}" />
+                            <ProgressBar Progress="{Binding YoutubeProgress, Converter={StaticResource DivideBy100}}"
+                                         ProgressColor="#4A9EFF" IsVisible="{Binding IsDownloading}" />
+                            <Label Text="{Binding YoutubeStatusText}" TextColor="#999" FontSize="13"
+                                   HorizontalOptions="Center" />
+                        </VerticalStackLayout>
+                    </ScrollView>
+                </Grid>
+            </Grid>
+
+            <!-- ▼ WIDE LAYOUT (태블릿/가로, 너비 ≥ 600dp) — 3열 -->
+            <Grid IsVisible="{Binding IsWideLayout}" ColumnDefinitions="*,*,*" ColumnSpacing="4">
+
+                <!-- 왼쪽: Playlist 항상 표시 -->
+                <Grid Grid.Column="0" RowDefinitions="Auto,Auto,*" Padding="8,0" BackgroundColor="#282828">
+                    <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto" Margin="0,0,0,8">
+                        <Label Text="Playlist" TextColor="#4EC9B0" FontSize="14" FontAttributes="Bold"
+                               VerticalOptions="Center" />
+                        <Button Grid.Column="1" Text="💾" FontSize="16"
+                                BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                                WidthRequest="44" HeightRequest="44" CornerRadius="22"
+                                Clicked="OnSavePlaylist" />
+                        <Button Grid.Column="2" Text="📂" FontSize="16"
+                                BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                                WidthRequest="44" HeightRequest="44" CornerRadius="22"
+                                Clicked="OnLoadPlaylist" />
+                        <Button Grid.Column="3" Text="🗑️" FontSize="16"
+                                BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                                WidthRequest="44" HeightRequest="44" CornerRadius="22"
+                                Command="{Binding RemoveSelectedTracksCommand}" />
+                        <Button Grid.Column="4" Text="🎸" FontSize="16"
+                                BackgroundColor="#2D2D30" TextColor="#FFB900"
+                                WidthRequest="44" HeightRequest="44" CornerRadius="22"
+                                Command="{Binding ExtractAccompanimentCommand}"
+                                IsEnabled="{Binding IsExtracting, Converter={StaticResource InvertBool}}" />
+                        <Button Grid.Column="5" Text="+" FontSize="20"
+                                BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                                WidthRequest="44" HeightRequest="44" CornerRadius="22"
+                                Clicked="OnAddFiles" />
+                    </Grid>
+                    <!-- 반주 추출 진행 표시 -->
+                    <Grid Grid.Row="1" IsVisible="{Binding IsExtracting}"
+                          ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" Padding="4,0,4,6">
+                        <Label Grid.Row="0" Grid.Column="0" Text="{Binding ExtractionStatusText}"
+                               TextColor="#FFB900" FontSize="11" />
+                        <Button Grid.Row="0" Grid.Column="1" Text="✕" FontSize="12"
+                                BackgroundColor="Transparent" TextColor="#E74C3C"
+                                WidthRequest="32" HeightRequest="24" Padding="0"
+                                Command="{Binding CancelExtractionCommand}" />
+                        <ProgressBar Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                                     Progress="{Binding ExtractionProgress, Converter={StaticResource DivideBy100}}"
+                                     ProgressColor="#FF8C00" />
+                    </Grid>
+                    <CollectionView x:Name="PlaylistViewWide" Grid.Row="2"
+                                    ItemsSource="{Binding Playlist}" SelectionMode="None"
+                                    CanReorderItems="True">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="models:PlaylistItem">
+                                <SwipeView>
+                                    <SwipeView.RightItems>
+                                        <SwipeItems>
+                                            <SwipeItem Text="Delete" BackgroundColor="#E74C3C"
+                                                       Invoked="OnSwipeDeleteTrack" />
+                                        </SwipeItems>
+                                    </SwipeView.RightItems>
+                                    <Grid Padding="12,10" Margin="0,2" ColumnDefinitions="*,Auto">
+                                        <Grid.Triggers>
+                                            <DataTrigger TargetType="Grid" Binding="{Binding IsSelected}" Value="True">
+                                                <Setter Property="BackgroundColor" Value="#1A3A5C" />
+                                            </DataTrigger>
+                                            <DataTrigger TargetType="Grid" Binding="{Binding IsSelected}" Value="False">
+                                                <Setter Property="BackgroundColor" Value="#2D2D30" />
+                                            </DataTrigger>
+                                        </Grid.Triggers>
+                                        <Grid.GestureRecognizers>
+                                            <TapGestureRecognizer Tapped="OnPlaylistItemTapped" NumberOfTapsRequired="1" />
+                                            <TapGestureRecognizer Tapped="OnPlaylistItemDoubleTapped" NumberOfTapsRequired="2" />
+                                        </Grid.GestureRecognizers>
+                                        <Label Grid.Column="0" Text="{Binding DisplayName}"
+                                               TextColor="#E1E1E1" FontSize="14" VerticalOptions="Center" />
+                                        <Label Grid.Column="1" Text="☰" TextColor="#666" FontSize="18"
+                                               VerticalOptions="Center" Padding="8,0,0,0" />
+                                    </Grid>
+                                </SwipeView>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </Grid>
+
+                <!-- 오른쪽: 탭 스위치 + Lyrics / YouTube -->
+                <Grid Grid.Column="1" RowDefinitions="Auto,*" BackgroundColor="#252526">
+                    <!-- 가사|유튜브추출 탭 스위치 -->
+                    <Grid Grid.Row="0" ColumnDefinitions="*,*" HeightRequest="40" BackgroundColor="#252526">
+                        <Button Grid.Column="0" Text="가사" FontSize="13"
+                                BackgroundColor="#2D2D30" TextColor="#666"
+                                HeightRequest="40" CornerRadius="0" Padding="0"
+                                Command="{Binding ShowLyricsTabCommand}">
+                            <Button.Triggers>
+                                <DataTrigger TargetType="Button" Binding="{Binding ShowLyrics}" Value="True">
+                                    <Setter Property="BackgroundColor" Value="#1A3A5C" />
+                                    <Setter Property="TextColor" Value="#4A9EFF" />
+                                    <Setter Property="FontAttributes" Value="Bold" />
+                                </DataTrigger>
+                            </Button.Triggers>
+                        </Button>
+                        <Button Grid.Column="1" Text="유튜브추출" FontSize="13"
+                                BackgroundColor="#2D2D30" TextColor="#666"
+                                HeightRequest="40" CornerRadius="0" Padding="0"
+                                Command="{Binding ShowYoutubeTabCommand}">
+                            <Button.Triggers>
+                                <DataTrigger TargetType="Button" Binding="{Binding ShowYoutube}" Value="True">
+                                    <Setter Property="BackgroundColor" Value="#1A3A5C" />
+                                    <Setter Property="TextColor" Value="#4A9EFF" />
+                                    <Setter Property="FontAttributes" Value="Bold" />
+                                </DataTrigger>
+                            </Button.Triggers>
+                        </Button>
+                    </Grid>
+                    <!-- Lyrics -->
+                    <Grid Grid.Row="1" IsVisible="{Binding ShowLyrics}" RowDefinitions="Auto,*" Padding="8,4">
+                        <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,Auto,*,Auto" Margin="0,0,0,8">
+                            <Button Grid.Column="0" Text="A-" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                                    WidthRequest="40" HeightRequest="36" FontSize="12"
+                                    Command="{Binding LyricsFontDownCommand}" />
+                            <Button Grid.Column="1" Text="A" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                                    WidthRequest="40" HeightRequest="36" FontSize="14" />
+                            <Button Grid.Column="2" Text="A+" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                                    WidthRequest="40" HeightRequest="36" FontSize="12"
+                                    Command="{Binding LyricsFontUpCommand}" />
+                            <Label Grid.Column="3" />
+                            <Button Grid.Column="4" Text="{Binding LyricsEditModeText}"
+                                    BackgroundColor="#2D2D30" TextColor="#4A9EFF"
+                                    HeightRequest="36" FontSize="12"
+                                    Command="{Binding ToggleLyricsEditCommand}"
+                                    Clicked="OnLyricsEditDone" />
+                        </Grid>
+                        <ScrollView Grid.Row="1">
+                            <Editor x:Name="LyricsEditorWide"
+                                    Text="{Binding LyricsText}"
+                                    FontSize="{Binding LyricsFontSize}"
+                                    TextColor="#E1E1E1" BackgroundColor="#252526"
+                                    IsReadOnly="{Binding LyricsEditMode, Converter={StaticResource InvertBool}}"
+                                    AutoSize="TextChanges" />
+                        </ScrollView>
+                    </Grid>
+                    <!-- YouTube -->
+                    <ScrollView Grid.Row="1" IsVisible="{Binding ShowYoutube}">
+                        <VerticalStackLayout Padding="16,8" Spacing="12">
+                            <Label Text="YouTube Download" TextColor="#4EC9B0" FontSize="16" FontAttributes="Bold" />
+                            <Label Text="YouTube URL" TextColor="#999" FontSize="12" />
+                            <Entry Text="{Binding YoutubeUrl}"
+                                   Placeholder="https://www.youtube.com/watch?v=..."
+                                   PlaceholderColor="#666" TextColor="#E1E1E1" BackgroundColor="#2D2D30"
+                                   FontSize="14" Keyboard="Url" />
+                            <Button Text="Download" BackgroundColor="#4A9EFF" TextColor="White"
+                                    FontSize="16" HeightRequest="48" CornerRadius="8"
+                                    Command="{Binding DownloadYoutubeCommand}"
+                                    IsEnabled="{Binding IsDownloading, Converter={StaticResource InvertBool}}" />
+                            <ProgressBar Progress="{Binding YoutubeProgress, Converter={StaticResource DivideBy100}}"
+                                         ProgressColor="#4A9EFF" IsVisible="{Binding IsDownloading}" />
+                            <Label Text="{Binding YoutubeStatusText}" TextColor="#999" FontSize="13"
+                                   HorizontalOptions="Center" />
+                        </VerticalStackLayout>
+                    </ScrollView>
+                </Grid>
+
+                <!-- Column 2: Controls (Wide 전용) -->
+                <ScrollView Grid.Column="2">
+                    <VerticalStackLayout Padding="8,4,8,8" Spacing="6" BackgroundColor="#252526">
+                        <!-- Pitch -->
+                        <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,4">
+                            <Button Grid.Column="0" Text="-" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                                    WidthRequest="60" HeightRequest="60" FontSize="28" Padding="0"
+                                    VerticalOptions="Center" Command="{Binding PitchDownCommand}" />
+                            <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="0">
+                                <Label Text="{Binding PitchText}" TextColor="#4A9EFF" FontSize="12"
+                                       HorizontalOptions="Center" FontAttributes="Bold" />
+                                <Slider Minimum="-8" Maximum="8" Value="{Binding Pitch}"
+                                        DragCompleted="OnPitchDragCompleted"
+                                        ThumbColor="#4A9EFF" MinimumTrackColor="#4A9EFF" MaximumTrackColor="#444" />
+                                <Grid ColumnDefinitions="*,*,*">
+                                    <Label Grid.Column="0" Text="-8" HorizontalOptions="Start" TextColor="#666" FontSize="10" />
+                                    <Label Grid.Column="1" Text="0" HorizontalOptions="Center" TextColor="#4A9EFF" FontSize="11" FontAttributes="Bold" />
+                                    <Label Grid.Column="2" Text="+8" HorizontalOptions="End" TextColor="#666" FontSize="10" />
+                                </Grid>
+                            </VerticalStackLayout>
+                            <Button Grid.Column="2" Text="+" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                                    WidthRequest="60" HeightRequest="60" FontSize="28" Padding="0"
+                                    VerticalOptions="Center" Command="{Binding PitchUpCommand}" />
+                            <Button Grid.Column="3" Text="RST" BackgroundColor="#2D2D30" TextColor="#4EC9B0"
+                                    HeightRequest="60" FontSize="14" Padding="0"
+                                    VerticalOptions="Center" Command="{Binding PitchResetCommand}" />
+                        </Grid>
+                        <!-- Tempo -->
+                        <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                            <Button Grid.Column="0" Text="-" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                                    WidthRequest="60" HeightRequest="60" FontSize="28" Padding="0"
+                                    VerticalOptions="Center" Command="{Binding TempoDownCommand}" />
+                            <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="0">
+                                <Label Text="{Binding TempoText}" TextColor="#4A9EFF" FontSize="12"
+                                       HorizontalOptions="Center" FontAttributes="Bold" />
+                                <Slider Minimum="-100" Maximum="100" Value="{Binding Tempo}"
+                                        ThumbColor="#4A9EFF" MinimumTrackColor="#4A9EFF" MaximumTrackColor="#444" />
+                                <Grid ColumnDefinitions="*,*,*">
+                                    <Label Grid.Column="0" Text="0%" HorizontalOptions="Start" TextColor="#666" FontSize="10" />
+                                    <Label Grid.Column="1" Text="100%" HorizontalOptions="Center" TextColor="#4A9EFF" FontSize="11" FontAttributes="Bold" />
+                                    <Label Grid.Column="2" Text="200%" HorizontalOptions="End" TextColor="#666" FontSize="10" />
+                                </Grid>
+                            </VerticalStackLayout>
+                            <Button Grid.Column="2" Text="+" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                                    WidthRequest="60" HeightRequest="60" FontSize="28" Padding="0"
+                                    VerticalOptions="Center" Command="{Binding TempoUpCommand}" />
+                            <Button Grid.Column="3" Text="RST" BackgroundColor="#2D2D30" TextColor="#4EC9B0"
+                                    HeightRequest="60" FontSize="14" Padding="0"
+                                    VerticalOptions="Center" Command="{Binding TempoResetCommand}" />
+                        </Grid>
+                        <!-- Volume -->
+                        <Grid ColumnDefinitions="44,*,50">
+                            <Button Grid.Column="0" Text="{Binding VolumeIcon}" FontSize="26"
+                                    BackgroundColor="Transparent" TextColor="#E1E1E1"
+                                    WidthRequest="44" HeightRequest="44" Padding="0"
+                                    Command="{Binding ToggleMuteCommand}" />
+                            <Slider Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding Volume}"
+                                    ThumbColor="#4EC9B0" MinimumTrackColor="#4EC9B0" MaximumTrackColor="#444" />
+                            <Label Grid.Column="2" Text="{Binding VolumeText}" TextColor="#999" FontSize="11"
+                                   HorizontalOptions="End" VerticalOptions="Center" />
+                        </Grid>
+                        <!-- AB info -->
+                        <Label Text="{Binding AbInfoText}" TextColor="#FF8C00" FontSize="13"
+                               HorizontalOptions="Center" FontAttributes="Bold" />
+                        <!-- Export MP3 + Open Folder -->
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8"
+                              IsVisible="{Binding IsExporting, Converter={StaticResource InvertBool}}">
+                            <Button Grid.Column="0" Text="MP3 내보내기"
+                                    Command="{Binding ExportMp3Command}"
+                                    BackgroundColor="#2D2D30" TextColor="#4EC9B0"
+                                    FontSize="13" HeightRequest="38" CornerRadius="8" />
+                            <Button Grid.Column="1" Text="📂" FontSize="15"
+                                    BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                                    WidthRequest="40" HeightRequest="38" CornerRadius="8"
+                                    Command="{Binding OpenExportFolderCommand}" />
+                        </Grid>
+                        <VerticalStackLayout IsVisible="{Binding IsExporting}" Spacing="2">
+                            <Label Text="{Binding ExportStatusText}" TextColor="#4A9EFF" FontSize="12"
+                                   HorizontalOptions="Center" />
+                            <ProgressBar Progress="{Binding ExportProgress, Converter={StaticResource DivideBy100}}"
+                                         ProgressColor="#4A9EFF" HeightRequest="6" />
+                        </VerticalStackLayout>
+                        <!-- Main Playback Controls -->
+                        <Grid ColumnDefinitions="*,*,1.6*,*,*" ColumnSpacing="4" HeightRequest="72">
+                            <Button Grid.Column="0" Text="{Binding RepeatIcon}" FontSize="15" Padding="0"
+                                    BackgroundColor="{Binding RepeatBgColor}"
+                                    TextColor="White" CornerRadius="36"
+                                    Command="{Binding CycleRepeatCommand}" />
+                            <Button Grid.Column="1" Text="&#x23EE;" FontSize="26" Padding="0"
+                                    BackgroundColor="#2D2D30" TextColor="#E1E1E1" CornerRadius="36"
+                                    Command="{Binding PreviousTrackCommand}" />
+                            <Button Grid.Column="2" Text="{Binding PlayPauseIcon}" FontSize="34" Padding="0"
+                                    BackgroundColor="#4A9EFF" TextColor="White" CornerRadius="36"
+                                    Command="{Binding PlayPauseCommand}" />
+                            <Button Grid.Column="3" Text="&#x23ED;" FontSize="26" Padding="0"
+                                    BackgroundColor="#2D2D30" TextColor="#E1E1E1" CornerRadius="36"
+                                    Command="{Binding NextTrackCommand}" />
+                            <Button Grid.Column="4" Text="&#x25A0;" FontSize="24" Padding="0"
+                                    BackgroundColor="#2D2D30" TextColor="White" CornerRadius="36"
+                                    Command="{Binding StopPlaybackCommand}" />
+                        </Grid>
+                        <!-- Toggles + AB -->
+                        <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="4" HeightRequest="58">
+                            <Button Grid.Column="0" Text="Random" FontSize="12" Padding="0"
+                                    BackgroundColor="{Binding ShuffleMode, Converter={StaticResource BoolToActiveColor}}"
+                                    TextColor="White" CornerRadius="29"
+                                    Command="{Binding ToggleShuffleCommand}" />
+                            <Button Grid.Column="1" Text="A" FontSize="18" Padding="0"
+                                    BackgroundColor="#2D2D30" TextColor="#E1E1E1" CornerRadius="29"
+                                    Command="{Binding SetPointACommand}">
+                                <Button.Triggers>
+                                    <DataTrigger TargetType="Button" Binding="{Binding IsPointASet}" Value="True">
+                                        <Setter Property="BackgroundColor" Value="#1A4A7E" />
+                                        <Setter Property="TextColor" Value="#4A9EFF" />
+                                    </DataTrigger>
+                                </Button.Triggers>
+                            </Button>
+                            <Button Grid.Column="2" Text="B" FontSize="18" Padding="0"
+                                    BackgroundColor="#2D2D30" TextColor="#E1E1E1" CornerRadius="29"
+                                    Command="{Binding SetPointBCommand}">
+                                <Button.Triggers>
+                                    <DataTrigger TargetType="Button" Binding="{Binding IsPointBSet}" Value="True">
+                                        <Setter Property="BackgroundColor" Value="#1A4A7E" />
+                                        <Setter Property="TextColor" Value="#4A9EFF" />
+                                    </DataTrigger>
+                                </Button.Triggers>
+                            </Button>
+                            <Button Grid.Column="3" Text="CLR" FontSize="16" Padding="0"
+                                    BackgroundColor="#2D2D30" TextColor="#E74C3C" CornerRadius="29"
+                                    Command="{Binding ClearABCommand}" />
+                        </Grid>
+                    </VerticalStackLayout>
+                </ScrollView>
+            </Grid>
+
+        </Grid>
+
+        <!-- ═══ BOTTOM: Controls (세로/Narrow 전용) ═══ -->
+        <VerticalStackLayout Grid.Row="2"
+                             IsVisible="{Binding IsNarrowLayout}"
+                             Padding="12,4,12,16" Spacing="6"
+                             BackgroundColor="#252526">
+
+            <!-- Pitch / Tempo -->
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,4">
+                <Button Grid.Column="0" Text="-" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                        WidthRequest="72" HeightRequest="72" FontSize="32" Padding="0"
+                        VerticalOptions="Center"
+                        Command="{Binding PitchDownCommand}" />
+                <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="0">
+                    <Label Text="{Binding PitchText}" TextColor="#4A9EFF" FontSize="12"
+                           HorizontalOptions="Center" FontAttributes="Bold" />
+                    <Slider Minimum="-8" Maximum="8"
+                            Value="{Binding Pitch}"
+                            DragCompleted="OnPitchDragCompleted"
+                            ThumbColor="#4A9EFF" MinimumTrackColor="#4A9EFF" MaximumTrackColor="#444" />
+                    <Grid ColumnDefinitions="*,*,*,*,*">
+                        <Label Grid.Column="0" Text="-8" HorizontalOptions="Start" TextColor="#666" FontSize="11" />
+                        <Label Grid.Column="1" Text="-4" HorizontalOptions="Center" TextColor="#666" FontSize="11" />
+                        <Label Grid.Column="2" Text="0" HorizontalOptions="Center" TextColor="#4A9EFF" FontSize="12" FontAttributes="Bold" />
+                        <Label Grid.Column="3" Text="+4" HorizontalOptions="Center" TextColor="#666" FontSize="11" />
+                        <Label Grid.Column="4" Text="+8" HorizontalOptions="End" TextColor="#666" FontSize="11" />
+                    </Grid>
+                </VerticalStackLayout>
+                <Button Grid.Column="2" Text="+" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                        WidthRequest="72" HeightRequest="72" FontSize="32" Padding="0"
+                        VerticalOptions="Center"
+                        Command="{Binding PitchUpCommand}" />
+                <Button Grid.Column="3" Text="RST" BackgroundColor="#2D2D30" TextColor="#4EC9B0"
+                        HeightRequest="72" FontSize="18" Padding="0"
+                        VerticalOptions="Center"
+                        Command="{Binding PitchResetCommand}" />
+            </Grid>
+
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,0,0,4">
+                <Button Grid.Column="0" Text="-" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                        WidthRequest="72" HeightRequest="72" FontSize="32" Padding="0"
+                        VerticalOptions="Center"
+                        Command="{Binding TempoDownCommand}" />
+                <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="0">
+                    <Label Text="{Binding TempoText}" TextColor="#4A9EFF" FontSize="12"
+                           HorizontalOptions="Center" FontAttributes="Bold" />
+                    <Slider Minimum="-100" Maximum="100"
+                            Value="{Binding Tempo}"
+                            ThumbColor="#4A9EFF" MinimumTrackColor="#4A9EFF" MaximumTrackColor="#444" />
+                    <Grid ColumnDefinitions="*,*,*,*,*">
+                        <Label Grid.Column="0" Text="0%" HorizontalOptions="Start" TextColor="#666" FontSize="11" />
+                        <Label Grid.Column="1" Text="50%" HorizontalOptions="Center" TextColor="#666" FontSize="11" />
+                        <Label Grid.Column="2" Text="100%" HorizontalOptions="Center" TextColor="#4A9EFF" FontSize="12" FontAttributes="Bold" />
+                        <Label Grid.Column="3" Text="150%" HorizontalOptions="Center" TextColor="#666" FontSize="11" />
+                        <Label Grid.Column="4" Text="200%" HorizontalOptions="End" TextColor="#666" FontSize="11" />
+                    </Grid>
+                </VerticalStackLayout>
+                <Button Grid.Column="2" Text="+" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                        WidthRequest="72" HeightRequest="72" FontSize="32" Padding="0"
+                        VerticalOptions="Center"
+                        Command="{Binding TempoUpCommand}" />
+                <Button Grid.Column="3" Text="RST" BackgroundColor="#2D2D30" TextColor="#4EC9B0"
+                        HeightRequest="72" FontSize="18" Padding="0"
+                        VerticalOptions="Center"
+                        Command="{Binding TempoResetCommand}" />
+            </Grid>
+
+            <!-- Volume -->
+            <Grid ColumnDefinitions="44,*,50">
+                <Button Grid.Column="0" Text="{Binding VolumeIcon}" FontSize="28"
+                        BackgroundColor="Transparent" TextColor="#E1E1E1"
+                        WidthRequest="44" HeightRequest="44" Padding="0"
+                        Command="{Binding ToggleMuteCommand}" />
+                <Slider Grid.Column="1" Minimum="0" Maximum="100"
+                        Value="{Binding Volume}"
+                        ThumbColor="#4EC9B0" MinimumTrackColor="#4EC9B0" MaximumTrackColor="#444" />
+                <Label Grid.Column="2" Text="{Binding VolumeText}" TextColor="#999" FontSize="11"
+                       HorizontalOptions="End" VerticalOptions="Center" />
+            </Grid>
+
+            <!-- AB info -->
+            <Label Text="{Binding AbInfoText}" TextColor="#FF8C00" FontSize="14"
+                   HorizontalOptions="Center" FontAttributes="Bold" />
+
+            <!-- Export MP3 + Open Folder -->
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8"
+                  IsVisible="{Binding IsExporting, Converter={StaticResource InvertBool}}">
+                <Button Grid.Column="0" Text="MP3 내보내기"
+                        Command="{Binding ExportMp3Command}"
+                        BackgroundColor="#2D2D30" TextColor="#4EC9B0"
+                        FontSize="14" HeightRequest="40" CornerRadius="8" />
+                <Button Grid.Column="1" Text="📂" FontSize="16"
+                        BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                        WidthRequest="44" HeightRequest="40" CornerRadius="8"
+                        Command="{Binding OpenExportFolderCommand}" />
+            </Grid>
+            <VerticalStackLayout IsVisible="{Binding IsExporting}" Spacing="2">
+                <Label Text="{Binding ExportStatusText}" TextColor="#4A9EFF" FontSize="12"
+                       HorizontalOptions="Center" />
+                <ProgressBar Progress="{Binding ExportProgress, Converter={StaticResource DivideBy100}}"
+                             ProgressColor="#4A9EFF" HeightRequest="6" />
+            </VerticalStackLayout>
+
+            <!-- Main Playback Controls (Row 1) -->
+            <Grid ColumnDefinitions="*,*,1.6*,*,*" ColumnSpacing="6" HeightRequest="84">
+                <Button Grid.Column="0" Text="{Binding RepeatIcon}" FontSize="18" Padding="0"
+                        BackgroundColor="{Binding RepeatBgColor}"
+                        TextColor="White" CornerRadius="42"
+                        Command="{Binding CycleRepeatCommand}" />
+                <Button Grid.Column="1" Text="&#x23EE;" FontSize="30" Padding="0"
+                        BackgroundColor="#2D2D30" TextColor="#E1E1E1" CornerRadius="42"
+                        Command="{Binding PreviousTrackCommand}" />
+                <Button Grid.Column="2" Text="{Binding PlayPauseIcon}" FontSize="40" Padding="0"
+                        BackgroundColor="#4A9EFF" TextColor="White" CornerRadius="42"
+                        Command="{Binding PlayPauseCommand}" />
+                <Button Grid.Column="3" Text="&#x23ED;" FontSize="30" Padding="0"
+                        BackgroundColor="#2D2D30" TextColor="#E1E1E1" CornerRadius="42"
+                        Command="{Binding NextTrackCommand}" />
+                <Button Grid.Column="4" Text="&#x25A0;" FontSize="28" Padding="0"
+                        BackgroundColor="#2D2D30" TextColor="White" CornerRadius="42"
+                        Command="{Binding StopPlaybackCommand}" />
+            </Grid>
+
+            <!-- Toggles + AB (Row 2) -->
+            <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="6" HeightRequest="68">
+                <Button Grid.Column="0" Text="Random" FontSize="14" Padding="0"
+                        BackgroundColor="{Binding ShuffleMode, Converter={StaticResource BoolToActiveColor}}"
+                        TextColor="White" CornerRadius="34"
+                        Command="{Binding ToggleShuffleCommand}" />
+                <Button Grid.Column="1" Text="A" FontSize="22" Padding="0"
+                        BackgroundColor="#2D2D30" TextColor="#E1E1E1" CornerRadius="34"
+                        Command="{Binding SetPointACommand}">
+                    <Button.Triggers>
+                        <DataTrigger TargetType="Button" Binding="{Binding IsPointASet}" Value="True">
+                            <Setter Property="BackgroundColor" Value="#1A4A7E" />
+                            <Setter Property="TextColor" Value="#4A9EFF" />
+                        </DataTrigger>
+                    </Button.Triggers>
+                </Button>
+                <Button Grid.Column="2" Text="B" FontSize="22" Padding="0"
+                        BackgroundColor="#2D2D30" TextColor="#E1E1E1" CornerRadius="34"
+                        Command="{Binding SetPointBCommand}">
+                    <Button.Triggers>
+                        <DataTrigger TargetType="Button" Binding="{Binding IsPointBSet}" Value="True">
+                            <Setter Property="BackgroundColor" Value="#1A4A7E" />
+                            <Setter Property="TextColor" Value="#4A9EFF" />
+                        </DataTrigger>
+                    </Button.Triggers>
+                </Button>
+                <Button Grid.Column="3" Text="CLR" FontSize="20" Padding="0"
+                        BackgroundColor="#2D2D30" TextColor="#E74C3C" CornerRadius="34"
+                        Command="{Binding ClearABCommand}" />
+            </Grid>
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>

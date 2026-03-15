@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="456" height="456" viewBox="0 0 456 456" xmlns="http://www.w3.org/2000/svg">
+  <g fill="none" stroke="#FFFFFF" stroke-width="32" stroke-linecap="round" stroke-linejoin="round">
+    <!-- J: vertical bar, then hook curves left -->
+    <path d="M 182,130 L 182,280 Q 182,315 147,315 Q 112,315 112,280"/>
+    <!-- I: vertical bar -->
+    <line x1="250" y1="130" x2="250" y2="315"/>
+    <!-- P: vertical bar + bump to the right -->
+    <path d="M 305,315 L 305,130 C 362,130 362,224 305,224"/>
+  </g>
+</svg>

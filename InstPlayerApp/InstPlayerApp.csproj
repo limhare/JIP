@@ -1,0 +1,84 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFrameworks>net9.0-android</TargetFrameworks>
+		<OutputType>Exe</OutputType>
+		<RootNamespace>InstPlayerApp</RootNamespace>
+		<UseMaui>true</UseMaui>
+		<SingleProject>true</SingleProject>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+
+		<ApplicationTitle>JIP</ApplicationTitle>
+		<ApplicationId>com.instplayer.app</ApplicationId>
+		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+		<ApplicationVersion>1</ApplicationVersion>
+
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
+
+		<AndroidSdkDirectory>C:\Users\USER\AppData\Local\Android\Sdk</AndroidSdkDirectory>
+		<JavaSdkDirectory>d:\android\jbr</JavaSdkDirectory>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- App Icon -->
+		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#512BD4" />
+
+		<!-- Splash Screen -->
+		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
+
+		<!-- Images -->
+		<MauiImage Include="Resources\Images\*" />
+		<MauiImage Update="Resources\Images\dotnet_bot.png" Resize="True" BaseSize="300,185" />
+		
+		<!-- Custom Fonts -->
+		<MauiFont Include="Resources\Fonts\*" />
+
+		<!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
+		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+	</ItemGroup>
+
+	<!-- Android Java sources -->
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+		<AndroidJavaSource Include="Platforms\Android\AudioExporter.java" />
+		<AndroidJavaSource Include="Platforms\Android\DemucsProcessor.java" />
+	</ItemGroup>
+
+	<!-- SoundTouch native libraries -->
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+		<AndroidNativeLibrary Include="Platforms\Android\libs\arm64-v8a\libsoundtouch4c.so">
+			<Abi>arm64-v8a</Abi>
+		</AndroidNativeLibrary>
+		<AndroidNativeLibrary Include="Platforms\Android\libs\arm64-v8a\libc++_shared.so">
+			<Abi>arm64-v8a</Abi>
+		</AndroidNativeLibrary>
+		<AndroidNativeLibrary Include="Platforms\Android\libs\armeabi-v7a\libsoundtouch4c.so">
+			<Abi>armeabi-v7a</Abi>
+		</AndroidNativeLibrary>
+		<AndroidNativeLibrary Include="Platforms\Android\libs\armeabi-v7a\libc++_shared.so">
+			<Abi>armeabi-v7a</Abi>
+		</AndroidNativeLibrary>
+		<!-- Export: SoundTouch + LAME -->
+		<AndroidNativeLibrary Include="Platforms\Android\libs\arm64-v8a\libjip_export.so">
+			<Abi>arm64-v8a</Abi>
+		</AndroidNativeLibrary>
+		<AndroidNativeLibrary Include="Platforms\Android\libs\armeabi-v7a\libjip_export.so">
+			<Abi>armeabi-v7a</Abi>
+		</AndroidNativeLibrary>
+		<!-- Demucs: AI accompaniment extraction (arm64-v8a only) -->
+		<AndroidNativeLibrary Include="..\demucs_build\libs\arm64-v8a\libdemucs_jni.so">
+			<Abi>arm64-v8a</Abi>
+		</AndroidNativeLibrary>
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.0" />
+		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+		<PackageReference Include="CommunityToolkit.Maui" Version="11.1.0" />
+		<PackageReference Include="Xamarin.AndroidX.Media3.ExoPlayer" Version="1.6.0.1" />
+		<PackageReference Include="TagLibSharp" Version="2.3.0" />
+		<PackageReference Include="YoutubeExplode" Version="6.5.7" />
+	</ItemGroup>
+
+</Project>

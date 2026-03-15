@@ -1,0 +1,26 @@
+namespace InstPlayerApp.Services;
+
+public enum PlaybackStatus { Stopped, Playing, Paused }
+
+public interface IAudioPlayerService
+{
+    PlaybackStatus Status { get; }
+    TimeSpan Duration { get; }
+    TimeSpan Position { get; }
+    float Volume { get; set; }
+    float CurrentLevel { get; }
+
+    void LoadAndPlay(string filePath);
+    void Play();
+    void Pause();
+    void Stop();
+    void SeekTo(TimeSpan position);
+    void SetPitchTempo(int semitones, float tempoPercent);
+    Task<string> ExportMp3Async(string inputPath, int pitchSemitones, float tempoPercent,
+                                string outputPath, IProgress<int>? progress = null,
+                                CancellationToken ct = default);
+    void Dispose();
+
+    event Action? PlaybackEnded;
+    event Action<float>? LevelUpdated;
+}

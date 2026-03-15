@@ -1,0 +1,33 @@
+# Build outputs
+**/bin/
+**/obj/
+publish_apk/
+
+# IDE
+.vs/
+*.user
+*.suo
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Archives
+*.zip
+
+# Native C++ build (third-party source + intermediate outputs)
+demucs_build/src/
+demucs_build/libs/
+demucs_build/build_arm64/
+soundtouch_build/lame/
+soundtouch_build/soundtouch/
+soundtouch_build/libs/
+soundtouch_build/libs_export/
+soundtouch_build/out_export/
+soundtouch_build/out/
+
+# WPF version (separate project)
+instplayer_wpf/
+
+# Claude settings
+.claude/

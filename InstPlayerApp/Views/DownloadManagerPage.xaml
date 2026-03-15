@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:InstPlayerApp.Views"
+             x:Class="InstPlayerApp.Views.DownloadManagerPage"
+             x:DataType="local:DownloadManagerPage"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#1E1E1E">
+
+    <Grid RowDefinitions="Auto,*,Auto" Padding="0">
+
+        <!-- Header -->
+        <Label Grid.Row="0" Text="{Binding HeaderTitle}"
+               TextColor="#4EC9B0" FontSize="16" FontAttributes="Bold"
+               Padding="16,14" BackgroundColor="#252526" />
+
+        <!-- File list -->
+        <CollectionView Grid.Row="1" ItemsSource="{Binding Items}" Margin="0,4">
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="local:DownloadFileItem">
+                    <Grid ColumnDefinitions="Auto,*,Auto" Padding="12,10" Margin="4,2"
+                          BackgroundColor="#2D2D30">
+                        <Grid.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnFileItemTapped" />
+                        </Grid.GestureRecognizers>
+                        <!-- In-playlist indicator -->
+                        <Label Grid.Column="0"
+                               Text="✓" FontSize="16" WidthRequest="28"
+                               TextColor="#444"
+                               VerticalOptions="Center">
+                            <Label.Triggers>
+                                <DataTrigger TargetType="Label" Binding="{Binding IsInPlaylist}" Value="True">
+                                    <Setter Property="TextColor" Value="#4EC9B0" />
+                                </DataTrigger>
+                            </Label.Triggers>
+                        </Label>
+                        <!-- File name -->
+                        <Label Grid.Column="1"
+                               Text="{Binding Name}" FontSize="14"
+                               TextColor="#E1E1E1"
+                               VerticalOptions="Center" LineBreakMode="TailTruncation" />
+                        <!-- Delete button -->
+                        <Button Grid.Column="2" Text="✕" FontSize="14"
+                                BackgroundColor="Transparent" TextColor="#E74C3C"
+                                WidthRequest="40" HeightRequest="40" Padding="0"
+                                Clicked="OnDeleteFileTapped" />
+                    </Grid>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <!-- Bottom buttons -->
+        <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Padding="12,8,12,12"
+              BackgroundColor="#252526" ColumnSpacing="8">
+            <Button Grid.Column="0" Text="📁 파일 브라우저"
+                    BackgroundColor="#2D2D30" TextColor="#4A9EFF"
+                    FontSize="14" HeightRequest="44" CornerRadius="8"
+                    Clicked="OnOpenFileBrowser" />
+            <Button Grid.Column="1" Text="닫기"
+                    BackgroundColor="#2D2D30" TextColor="#999"
+                    FontSize="14" HeightRequest="44" WidthRequest="80" CornerRadius="8"
+                    Clicked="OnClose" />
+        </Grid>
+
+    </Grid>
+</ContentPage>
