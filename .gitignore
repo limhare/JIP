@@ -37,6 +37,10 @@ soundtouch_build/libs/
 soundtouch_build/libs_export/
 soundtouch_build/out_export/
 soundtouch_build/out/
+soundtouch_build/lame-3.100/
+rubberband_build/rubberband/
+rubberband_build/libs/
+rubberband_build/obj/
 
 # WPF version (separate project)
 instplayer_wpf/

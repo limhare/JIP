@@ -395,6 +395,72 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
+    [RelayCommand]
+    private async Task ExportMp3HQ()
+    {
+        if (IsExporting) return;
+        if (CurrentIndex < 0 || CurrentIndex >= Playlist.Count)
+        {
+            await Shell.Current.DisplayAlert("HQ 내보내기", "재생 중인 파일이 없습니다.", "확인");
+            return;
+        }
+
+        string inputPath = Playlist[CurrentIndex].FilePath;
+        string baseName  = Path.GetFileNameWithoutExtension(inputPath);
+        string pitchStr  = Pitch == 0 ? "" : $"_P{Pitch:+0;-0}";
+        string tempoStr  = (int)Tempo == 0 ? "" : $"_T{100 + (int)Tempo}";
+        string outName   = $"{baseName}_HQ{pitchStr}{tempoStr}.mp3";
+
+#if ANDROID
+        string musicDir = global::Android.OS.Environment
+            .GetExternalStoragePublicDirectory(global::Android.OS.Environment.DirectoryMusic)!.AbsolutePath;
+#else
+        string musicDir = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic);
+#endif
+        Directory.CreateDirectory(musicDir);
+        string outputPath = Path.Combine(musicDir, outName);
+
+        IsExporting = true;
+        ExportProgress = 0;
+        ExportStatusText = "HQ 변환 중...";
+
+        var cts = new CancellationTokenSource();
+        try
+        {
+            var prog = new Progress<int>(p =>
+            {
+                ExportProgress = p;
+                ExportStatusText = $"HQ 변환 중... {p}%";
+            });
+
+            string result = await _audio.ExportMp3HQAsync(inputPath, Pitch, Tempo, outputPath, prog, cts.Token);
+
+            ExportStatusText = "HQ 완료!";
+            ExportProgress = 100;
+
+            if (Playlist.All(p => p.FilePath != result))
+                Playlist.Add(new PlaylistItem { FilePath = result });
+
+#if ANDROID
+            ShareExportedFile(result);
+#endif
+        }
+        catch (OperationCanceledException)
+        {
+            ExportStatusText = "취소됨";
+            await Shell.Current.DisplayAlert("HQ 내보내기", "취소되었습니다.", "확인");
+        }
+        catch (Exception ex)
+        {
+            ExportStatusText = $"오류";
+            await Shell.Current.DisplayAlert("HQ 내보내기 오류", ex.Message, "확인");
+        }
+        finally
+        {
+            IsExporting = false;
+        }
+    }
+
 #if ANDROID
     private static void ShareExportedFile(string filePath)
     {
@@ -679,6 +745,21 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         if (LyricsEditMode) SaveCurrentLyrics(); // Done 누를 때 저장
         LyricsEditMode = !LyricsEditMode;
+    }
+
+    [RelayCommand]
+    private async Task CopyAllLyrics()
+    {
+        if (!string.IsNullOrEmpty(LyricsText))
+            await Clipboard.Default.SetTextAsync(LyricsText);
+    }
+
+    [RelayCommand]
+    private async Task PasteLyrics()
+    {
+        var text = await Clipboard.Default.GetTextAsync();
+        if (text != null)
+            LyricsText = text;
     }
 
     // ── Library ──

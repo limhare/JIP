@@ -76,11 +76,25 @@
                                 BackgroundColor="#2D2D30" TextColor="#E1E1E1"
                                 WidthRequest="44" HeightRequest="44" CornerRadius="22"
                                 Command="{Binding RemoveSelectedTracksCommand}" />
-                        <Button Grid.Column="4" Text="🎸" FontSize="16"
-                                BackgroundColor="#2D2D30" TextColor="#FFB900"
-                                WidthRequest="44" HeightRequest="44" CornerRadius="22"
-                                Command="{Binding ExtractAccompanimentCommand}"
-                                IsEnabled="{Binding IsExtracting, Converter={StaticResource InvertBool}}" />
+                        <Border Grid.Column="4" StrokeThickness="1.5" Padding="0"
+                                StrokeShape="RoundRectangle 22,22,22,22">
+                            <Border.Stroke>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                    <GradientStop Color="#FF0000" Offset="0.0" />
+                                    <GradientStop Color="#FF8000" Offset="0.17" />
+                                    <GradientStop Color="#FFFF00" Offset="0.33" />
+                                    <GradientStop Color="#00FF00" Offset="0.5" />
+                                    <GradientStop Color="#0080FF" Offset="0.67" />
+                                    <GradientStop Color="#8000FF" Offset="0.83" />
+                                    <GradientStop Color="#FF0080" Offset="1.0" />
+                                </LinearGradientBrush>
+                            </Border.Stroke>
+                            <Button Text="🎸" FontSize="16"
+                                    BackgroundColor="#2D2D30" TextColor="#FFB900"
+                                    WidthRequest="44" HeightRequest="44" CornerRadius="22"
+                                    Command="{Binding ExtractAccompanimentCommand}"
+                                    IsEnabled="{Binding IsExtracting, Converter={StaticResource InvertBool}}" />
+                        </Border>
                         <Button Grid.Column="5" Text="+" FontSize="20"
                                 BackgroundColor="#2D2D30" TextColor="#E1E1E1"
                                 WidthRequest="44" HeightRequest="44" CornerRadius="22"
@@ -166,7 +180,7 @@
                     </Grid>
                     <!-- Lyrics -->
                     <Grid Grid.Row="1" IsVisible="{Binding ShowLyrics}" RowDefinitions="Auto,*" Padding="8,4">
-                        <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,Auto,*,Auto" Margin="0,0,0,8">
+                        <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto" Margin="0,0,0,8">
                             <Button Grid.Column="0" Text="A-" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
                                     WidthRequest="40" HeightRequest="36" FontSize="12"
                                     Command="{Binding LyricsFontDownCommand}" />
@@ -175,8 +189,15 @@
                             <Button Grid.Column="2" Text="A+" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
                                     WidthRequest="40" HeightRequest="36" FontSize="12"
                                     Command="{Binding LyricsFontUpCommand}" />
-                            <Label Grid.Column="3" />
-                            <Button Grid.Column="4" Text="{Binding LyricsEditModeText}"
+                            <Button Grid.Column="4" Text="All Copy" BackgroundColor="#2D2D30" TextColor="#4EC9B0"
+                                    HeightRequest="36" FontSize="11" Padding="6,0"
+                                    IsVisible="{Binding LyricsEditMode}"
+                                    Command="{Binding CopyAllLyricsCommand}" />
+                            <Button Grid.Column="5" Text="Paste" BackgroundColor="#2D2D30" TextColor="#FF8C00"
+                                    HeightRequest="36" FontSize="11" Padding="6,0"
+                                    IsVisible="{Binding LyricsEditMode}"
+                                    Command="{Binding PasteLyricsCommand}" />
+                            <Button Grid.Column="6" Text="{Binding LyricsEditModeText}"
                                     BackgroundColor="#2D2D30" TextColor="#4A9EFF"
                                     HeightRequest="36" FontSize="12"
                                     Command="{Binding ToggleLyricsEditCommand}"
@@ -233,11 +254,25 @@
                                 BackgroundColor="#2D2D30" TextColor="#E1E1E1"
                                 WidthRequest="44" HeightRequest="44" CornerRadius="22"
                                 Command="{Binding RemoveSelectedTracksCommand}" />
-                        <Button Grid.Column="4" Text="🎸" FontSize="16"
-                                BackgroundColor="#2D2D30" TextColor="#FFB900"
-                                WidthRequest="44" HeightRequest="44" CornerRadius="22"
-                                Command="{Binding ExtractAccompanimentCommand}"
-                                IsEnabled="{Binding IsExtracting, Converter={StaticResource InvertBool}}" />
+                        <Border Grid.Column="4" StrokeThickness="1.5" Padding="0"
+                                StrokeShape="RoundRectangle 22,22,22,22">
+                            <Border.Stroke>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                    <GradientStop Color="#FF0000" Offset="0.0" />
+                                    <GradientStop Color="#FF8000" Offset="0.17" />
+                                    <GradientStop Color="#FFFF00" Offset="0.33" />
+                                    <GradientStop Color="#00FF00" Offset="0.5" />
+                                    <GradientStop Color="#0080FF" Offset="0.67" />
+                                    <GradientStop Color="#8000FF" Offset="0.83" />
+                                    <GradientStop Color="#FF0080" Offset="1.0" />
+                                </LinearGradientBrush>
+                            </Border.Stroke>
+                            <Button Text="🎸" FontSize="16"
+                                    BackgroundColor="#2D2D30" TextColor="#FFB900"
+                                    WidthRequest="44" HeightRequest="44" CornerRadius="22"
+                                    Command="{Binding ExtractAccompanimentCommand}"
+                                    IsEnabled="{Binding IsExtracting, Converter={StaticResource InvertBool}}" />
+                        </Border>
                         <Button Grid.Column="5" Text="+" FontSize="20"
                                 BackgroundColor="#2D2D30" TextColor="#E1E1E1"
                                 WidthRequest="44" HeightRequest="44" CornerRadius="22"
@@ -323,7 +358,7 @@
                     </Grid>
                     <!-- Lyrics -->
                     <Grid Grid.Row="1" IsVisible="{Binding ShowLyrics}" RowDefinitions="Auto,*" Padding="8,4">
-                        <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,Auto,*,Auto" Margin="0,0,0,8">
+                        <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto" Margin="0,0,0,8">
                             <Button Grid.Column="0" Text="A-" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
                                     WidthRequest="40" HeightRequest="36" FontSize="12"
                                     Command="{Binding LyricsFontDownCommand}" />
@@ -332,8 +367,15 @@
                             <Button Grid.Column="2" Text="A+" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
                                     WidthRequest="40" HeightRequest="36" FontSize="12"
                                     Command="{Binding LyricsFontUpCommand}" />
-                            <Label Grid.Column="3" />
-                            <Button Grid.Column="4" Text="{Binding LyricsEditModeText}"
+                            <Button Grid.Column="4" Text="All Copy" BackgroundColor="#2D2D30" TextColor="#4EC9B0"
+                                    HeightRequest="36" FontSize="11" Padding="6,0"
+                                    IsVisible="{Binding LyricsEditMode}"
+                                    Command="{Binding CopyAllLyricsCommand}" />
+                            <Button Grid.Column="5" Text="Paste" BackgroundColor="#2D2D30" TextColor="#FF8C00"
+                                    HeightRequest="36" FontSize="11" Padding="6,0"
+                                    IsVisible="{Binding LyricsEditMode}"
+                                    Command="{Binding PasteLyricsCommand}" />
+                            <Button Grid.Column="6" Text="{Binding LyricsEditModeText}"
                                     BackgroundColor="#2D2D30" TextColor="#4A9EFF"
                                     HeightRequest="36" FontSize="12"
                                     Command="{Binding ToggleLyricsEditCommand}"
@@ -433,14 +475,32 @@
                         <!-- AB info -->
                         <Label Text="{Binding AbInfoText}" TextColor="#FF8C00" FontSize="13"
                                HorizontalOptions="Center" FontAttributes="Bold" />
-                        <!-- Export MP3 + Open Folder -->
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8"
+                        <!-- Export MP3 + HQ Export + Open Folder -->
+                        <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="4"
                               IsVisible="{Binding IsExporting, Converter={StaticResource InvertBool}}">
-                            <Button Grid.Column="0" Text="MP3 내보내기"
+                            <Button Grid.Column="0" Text="MP3"
                                     Command="{Binding ExportMp3Command}"
                                     BackgroundColor="#2D2D30" TextColor="#4EC9B0"
                                     FontSize="13" HeightRequest="38" CornerRadius="8" />
-                            <Button Grid.Column="1" Text="📂" FontSize="15"
+                            <Border Grid.Column="1" StrokeThickness="2" Padding="0"
+                                    StrokeShape="RoundRectangle 8,8,8,8">
+                                <Border.Stroke>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                        <GradientStop Color="#FF0000" Offset="0.0" />
+                                        <GradientStop Color="#FF8000" Offset="0.17" />
+                                        <GradientStop Color="#FFFF00" Offset="0.33" />
+                                        <GradientStop Color="#00FF00" Offset="0.5" />
+                                        <GradientStop Color="#0080FF" Offset="0.67" />
+                                        <GradientStop Color="#8000FF" Offset="0.83" />
+                                        <GradientStop Color="#FF0080" Offset="1.0" />
+                                    </LinearGradientBrush>
+                                </Border.Stroke>
+                                <Button Text="HQ MP3"
+                                        Command="{Binding ExportMp3HQCommand}"
+                                        BackgroundColor="#2D2D30" TextColor="#FFD700"
+                                        FontSize="13" HeightRequest="38" CornerRadius="6" />
+                            </Border>
+                            <Button Grid.Column="2" Text="📂" FontSize="15"
                                     BackgroundColor="#2D2D30" TextColor="#E1E1E1"
                                     WidthRequest="40" HeightRequest="38" CornerRadius="8"
                                     Command="{Binding OpenExportFolderCommand}" />
@@ -589,14 +649,32 @@
             <Label Text="{Binding AbInfoText}" TextColor="#FF8C00" FontSize="14"
                    HorizontalOptions="Center" FontAttributes="Bold" />
 
-            <!-- Export MP3 + Open Folder -->
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8"
+            <!-- Export MP3 + HQ Export + Open Folder -->
+            <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="4"
                   IsVisible="{Binding IsExporting, Converter={StaticResource InvertBool}}">
-                <Button Grid.Column="0" Text="MP3 내보내기"
+                <Button Grid.Column="0" Text="MP3"
                         Command="{Binding ExportMp3Command}"
                         BackgroundColor="#2D2D30" TextColor="#4EC9B0"
                         FontSize="14" HeightRequest="40" CornerRadius="8" />
-                <Button Grid.Column="1" Text="📂" FontSize="16"
+                <Border Grid.Column="1" StrokeThickness="2" Padding="0"
+                        StrokeShape="RoundRectangle 8,8,8,8">
+                    <Border.Stroke>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#FF0000" Offset="0.0" />
+                            <GradientStop Color="#FF8000" Offset="0.17" />
+                            <GradientStop Color="#FFFF00" Offset="0.33" />
+                            <GradientStop Color="#00FF00" Offset="0.5" />
+                            <GradientStop Color="#0080FF" Offset="0.67" />
+                            <GradientStop Color="#8000FF" Offset="0.83" />
+                            <GradientStop Color="#FF0080" Offset="1.0" />
+                        </LinearGradientBrush>
+                    </Border.Stroke>
+                    <Button Text="HQ MP3"
+                            Command="{Binding ExportMp3HQCommand}"
+                            BackgroundColor="#2D2D30" TextColor="#FFD700"
+                            FontSize="14" HeightRequest="40" CornerRadius="6" />
+                </Border>
+                <Button Grid.Column="2" Text="📂" FontSize="16"
                         BackgroundColor="#2D2D30" TextColor="#E1E1E1"
                         WidthRequest="44" HeightRequest="40" CornerRadius="8"
                         Command="{Binding OpenExportFolderCommand}" />

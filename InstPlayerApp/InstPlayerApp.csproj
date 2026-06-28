@@ -65,6 +65,13 @@
 		<AndroidNativeLibrary Include="Platforms\Android\libs\armeabi-v7a\libjip_export.so">
 			<Abi>armeabi-v7a</Abi>
 		</AndroidNativeLibrary>
+		<!-- HQ Export: Rubber Band + LAME -->
+		<AndroidNativeLibrary Include="Platforms\Android\libs\arm64-v8a\librb_export.so">
+			<Abi>arm64-v8a</Abi>
+		</AndroidNativeLibrary>
+		<AndroidNativeLibrary Include="Platforms\Android\libs\armeabi-v7a\librb_export.so">
+			<Abi>armeabi-v7a</Abi>
+		</AndroidNativeLibrary>
 		<!-- Demucs: AI accompaniment extraction (arm64-v8a only) -->
 		<AndroidNativeLibrary Include="..\demucs_build\libs\arm64-v8a\libdemucs_jni.so">
 			<Abi>arm64-v8a</Abi>

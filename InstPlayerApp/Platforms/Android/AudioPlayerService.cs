@@ -154,6 +154,15 @@ public class AudioPlayerService : IAudioPlayerService
                                            outputPath, progress, ct);
     }
 
+    public async Task<string> ExportMp3HQAsync(string inputPath, int pitchSemitones, float tempoPercent,
+                                                string outputPath, IProgress<int>? progress = null,
+                                                CancellationToken ct = default)
+    {
+        _exporter ??= new AudioExportBridge();
+        return await _exporter.ExportHQAsync(inputPath, pitchSemitones, tempoPercent,
+                                              outputPath, progress, ct);
+    }
+
     internal void OnStateEnded()
     {
         Status = PlaybackStatus.Stopped;
