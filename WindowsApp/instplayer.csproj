@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>instplayer</AssemblyName>
+    <RootNamespace>instplayer</RootNamespace>
+    <OutputType>WinExe</OutputType>
+    <UseWPF>true</UseWPF>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>12.0</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Nullable>annotations</Nullable>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <StartupObject>instplayer.App</StartupObject>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="jip.ico" LogicalName="jip.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="NAudio">
+      <HintPath>libs\NAudio.dll</HintPath>
+    </Reference>
+    <Reference Include="NAudio.Lame">
+      <HintPath>libs\NAudio.Lame.dll</HintPath>
+    </Reference>
+    <Reference Include="SoundTouch.Net">
+      <HintPath>libs\SoundTouch.Net.dll</HintPath>
+    </Reference>
+    <Reference Include="SoundTouch.Net.NAudioSupport">
+      <HintPath>libs\SoundTouch.Net.NAudioSupport.dll</HintPath>
+    </Reference>
+    <Reference Include="TagLibSharp">
+      <HintPath>libs\TagLibSharp.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="libs\libmp3lame.32.dll" CopyToOutputDirectory="PreserveNewest" Link="libmp3lame.32.dll" />
+    <None Include="libs\libmp3lame.64.dll" CopyToOutputDirectory="PreserveNewest" Link="libmp3lame.64.dll" />
+    <None Include="libs\rubberband\rubberband-r3.exe" CopyToOutputDirectory="PreserveNewest" Link="rubberband-r3.exe" />
+    <None Include="libs\rubberband\sndfile.dll" CopyToOutputDirectory="PreserveNewest" Link="sndfile.dll" />
+    <None Include="libs\yt-dlp.exe" CopyToOutputDirectory="PreserveNewest" Link="yt-dlp.exe" />
+  </ItemGroup>
+</Project>

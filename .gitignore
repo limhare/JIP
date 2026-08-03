@@ -44,6 +44,7 @@ rubberband_build/obj/
 
 # WPF version (separate project)
 instplayer_wpf/
+WindowsApp/publish/
 
 # Claude settings
 .claude/
