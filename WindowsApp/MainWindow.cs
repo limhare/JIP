@@ -1031,14 +1031,22 @@ public partial class MainWindow : Window
 				RedirectStandardError = true,
 				RedirectStandardOutput = true
 			};
+			StringBuilder rbErr = new StringBuilder();
 			using (Process proc = Process.Start(psi))
 			{
+				proc.ErrorDataReceived += delegate(object s2, DataReceivedEventArgs de)
+				{
+					if (de.Data != null && rbErr.Length < 4000)
+					{
+						rbErr.AppendLine(de.Data);
+					}
+				};
+				proc.BeginErrorReadLine();
 				proc.StandardOutput.ReadToEnd();
-				string stderr = proc.StandardError.ReadToEnd();
 				proc.WaitForExit();
 				if (proc.ExitCode != 0)
 				{
-					throw new Exception("rubberband error (" + proc.ExitCode + "): " + stderr);
+					throw new Exception("rubberband error (" + proc.ExitCode + "): " + rbErr.ToString());
 				}
 			}
 			if (isMp3)
@@ -1109,7 +1117,6 @@ public partial class MainWindow : Window
 			return;
 		}
 		string sourcePath = playlist[currentIndex];
-		int sourceIndex = currentIndex;
 		string outputPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(sourcePath) ?? "", System.IO.Path.GetFileNameWithoutExtension(sourcePath) + "_Inst.mp3");
 		if (MessageBox.Show(S($"AI로 보컬을 제거한 반주 파일을 만들까요?\n\n저장 위치: {outputPath}\n(GPU 사용 시 수십 초, CPU는 몇 분 걸릴 수 있습니다.)", $"Create an instrumental by removing vocals with AI?\n\nOutput: {outputPath}\n(Takes ~1 min on GPU, several minutes on CPU.)"), S("AI 반주 추출", "AI Instrumental"), MessageBoxButton.YesNo) != MessageBoxResult.Yes)
 		{
@@ -1124,11 +1131,20 @@ public partial class MainWindow : Window
 		try
 		{
 			await Task.Run(() => RunDemucs(demucsExe, sourcePath, outputPath, progress));
-			playlist[sourceIndex] = outputPath;
-			PlaylistBox.Items[sourceIndex] = System.IO.Path.GetFileName(outputPath);
-			if (currentIndex == sourceIndex)
+			int idx = playlist.IndexOf(sourcePath);
+			if (idx >= 0)
 			{
-				PlayTrack(sourceIndex);
+				playlist[idx] = outputPath;
+				PlaylistBox.Items[idx] = System.IO.Path.GetFileName(outputPath);
+				UpdatePlaylistHighlight();
+				if (currentIndex == idx)
+				{
+					PlayTrack(idx);
+				}
+			}
+			else
+			{
+				AddToPlaylist(outputPath);
 			}
 			MessageBox.Show(S("AI 반주 추출 완료!\n재생목록의 원본이 반주 파일로 대체되었습니다.", "AI instrumental complete!\nThe original in the playlist was replaced with the instrumental."));
 		}
@@ -3204,8 +3220,11 @@ public partial class MainWindow : Window
 				RedirectStandardOutput = true,
 				RedirectStandardError = true
 			});
+			process.ErrorDataReceived += delegate
+			{
+			};
+			process.BeginErrorReadLine();
 			process.StandardOutput.ReadToEnd();
-			process.StandardError.ReadToEnd();
 			process.WaitForExit();
 			return process.ExitCode;
 		}
