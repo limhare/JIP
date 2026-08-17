@@ -534,7 +534,7 @@
                                          ProgressColor="#4A9EFF" HeightRequest="6" />
                         </VerticalStackLayout>
                         <!-- Recording: 마이크 / 반주+마이크 -->
-                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="4">
+                        <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="4">
                             <Button Grid.Column="0" Text="{Binding RecordModeText}"
                                     Command="{Binding ToggleRecordModeCommand}"
                                     BackgroundColor="#2D2D30" TextColor="#E1E1E1"
@@ -543,7 +543,11 @@
                                     Command="{Binding ToggleRecordCommand}"
                                     BackgroundColor="#2D2D30" TextColor="#FF5555"
                                     FontSize="13" HeightRequest="38" CornerRadius="8" />
-                            <Label Grid.Column="2" Text="{Binding RecordStatusText}" TextColor="#4A9EFF"
+                            <Button Grid.Column="2" Text="{Binding RecordSyncText}"
+                                    Command="{Binding AdjustRecordSyncCommand}"
+                                    BackgroundColor="#2D2D30" TextColor="#4EC9B0"
+                                    FontSize="11" HeightRequest="38" CornerRadius="8" Padding="8,0" />
+                            <Label Grid.Column="3" Text="{Binding RecordStatusText}" TextColor="#4A9EFF"
                                    FontSize="11" VerticalOptions="Center" />
                         </Grid>
                         <!-- Main Playback Controls -->
@@ -722,7 +726,7 @@
             </VerticalStackLayout>
 
             <!-- Recording: 마이크 / 반주+마이크 -->
-            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="4">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="4">
                 <Button Grid.Column="0" Text="{Binding RecordModeText}"
                         Command="{Binding ToggleRecordModeCommand}"
                         BackgroundColor="#2D2D30" TextColor="#E1E1E1"
@@ -731,7 +735,11 @@
                         Command="{Binding ToggleRecordCommand}"
                         BackgroundColor="#2D2D30" TextColor="#FF5555"
                         FontSize="14" HeightRequest="40" CornerRadius="8" />
-                <Label Grid.Column="2" Text="{Binding RecordStatusText}" TextColor="#4A9EFF"
+                <Button Grid.Column="2" Text="{Binding RecordSyncText}"
+                        Command="{Binding AdjustRecordSyncCommand}"
+                        BackgroundColor="#2D2D30" TextColor="#4EC9B0"
+                        FontSize="12" HeightRequest="40" CornerRadius="8" Padding="8,0" />
+                <Label Grid.Column="3" Text="{Binding RecordStatusText}" TextColor="#4A9EFF"
                        FontSize="12" VerticalOptions="Center" />
             </Grid>
 

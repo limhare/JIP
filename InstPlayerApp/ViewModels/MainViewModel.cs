@@ -546,6 +546,28 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string recordModeText = "반주+마이크";
     [ObservableProperty] private bool isRecordSaving;
 
+    // 녹음 싱크 보정(ms): 출력+입력 지연만큼 목소리를 앞으로 당겨 믹스
+    [ObservableProperty] private int recordSyncMs = 250;
+    public string RecordSyncText => $"싱크 {RecordSyncMs}";
+
+    partial void OnRecordSyncMsChanged(int value)
+    {
+        OnPropertyChanged(nameof(RecordSyncText));
+    }
+
+    [RelayCommand]
+    private async Task AdjustRecordSync()
+    {
+        string? input = await Shell.Current.DisplayPromptAsync("녹음 싱크 보정",
+            "믹스에서 목소리가 늦게 들리면 값을 키우고,\n빠르게 들리면 줄이세요. (단위: ms, 0~1000)\n유선 이어폰 ≈ 150~300, 블루투스 ≈ 300~500",
+            "확인", "취소", RecordSyncMs.ToString(), keyboard: Keyboard.Numeric);
+        if (int.TryParse(input, out int v))
+        {
+            RecordSyncMs = Math.Clamp(v, 0, 1000);
+            SaveSettings();
+        }
+    }
+
 #if ANDROID
     private Platforms.Android.MicRecorder? _micRecorder;
     private string _recMicPath = "";
@@ -704,7 +726,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 await _audio.ExportMp3Async(_recMrPath, _recPitch, _recTempo, tmpMr, StageProg(0, 40));
                 await _audio.DecodeToWavAsync(tmpMr, tmpMrWav, StageProg(40, 65));
                 RecordStatusText = "저장 중... 68%";
-                await Task.Run(() => Platforms.Android.WavMixer.Mix(tmpMrWav, micWav, tmpMix, _recMrOffsetMs));
+                double mrOffset = Math.Max(0, _recMrOffsetMs - RecordSyncMs);
+                await Task.Run(() => Platforms.Android.WavMixer.Mix(tmpMrWav, micWav, tmpMix, mrOffset));
                 await _audio.ExportMp3Async(tmpMix, 0, 0, outputPath, StageProg(70, 100));
                 foreach (string t in new[] { tmpMr, tmpMrWav, tmpMix })
                 {
@@ -1276,6 +1299,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         ShuffleMode = _settings.Shuffle;
         LyricsFontSize = _settings.LyricsFontSize;
         IsKorean = _settings.Language == "ko";
+        RecordSyncMs = _settings.RecordSyncMs;
 
         foreach (var f in _settings.LibraryFolders)
             LibraryFolders.Add(f);
@@ -1299,6 +1323,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _settings.RepeatOne = RepeatOne;
         _settings.RepeatAll = RepeatAll;
         _settings.Shuffle = ShuffleMode;
+        _settings.RecordSyncMs = RecordSyncMs;
         _settings.LyricsFontSize = LyricsFontSize;
         _settings.Language = IsKorean ? "ko" : "en";
         _settings.LibraryFolders = [.. LibraryFolders];

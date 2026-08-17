@@ -14,6 +14,7 @@ public class AppSettings
     public bool Shuffle { get; set; }
     public int LyricsFontSize { get; set; } = 14;
     public string Language { get; set; } = "ko";
+    public int RecordSyncMs { get; set; } = 250;
 
     private static string FilePath => Path.Combine(FileSystem.AppDataDirectory, "settings.json");
 
