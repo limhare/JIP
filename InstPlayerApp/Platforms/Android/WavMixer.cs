@@ -32,7 +32,8 @@ internal static class WavMixer
         long mrSkip = (long)(mrOffsetMs / 1000.0 * mr.SampleRate);
         long mrFrames = Math.Max(0, mr.Frames - mrSkip);
         long micFrames = micMono.LongLength;
-        long frames = Math.Max(mrFrames, micFrames);
+        // 결과물 길이 = 마이크 녹음 길이 (반주는 그 구간만큼만 사용)
+        long frames = micFrames;
 
         using var fs = File.Create(outputWavPath);
         using var bw = new BinaryWriter(fs);
