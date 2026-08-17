@@ -263,6 +263,8 @@ public partial class MainWindow : Window
 
 	private DispatcherTimer? pitchReloadTimer;
 
+	private bool playingOriginalKeyOverride;
+
 	private string S(string kor, string eng)
 	{
 		if (!isKorean)
@@ -2646,8 +2648,9 @@ public partial class MainWindow : Window
 		UpdateAbInfo();
 		string fileToPlay = playlist[index];
 		playingPrerendered = false;
+		playingOriginalKeyOverride = IsRecordingFile(fileToPlay);
 		int pitchNow = (int)Math.Round(PitchSlider.Value);
-		if (autoPlayPitchFile && pitchNow != 0 && (int)Math.Round(TempoSlider.Value) == 0)
+		if (!playingOriginalKeyOverride && autoPlayPitchFile && pitchNow != 0 && (int)Math.Round(TempoSlider.Value) == 0)
 		{
 			string prerendered = FindPrerenderedPitchFile(playlist[index], pitchNow);
 			if (prerendered != null)
@@ -2660,8 +2663,8 @@ public partial class MainWindow : Window
 		{
 			audioFileReader = new AudioFileReader(fileToPlay);
 			soundTouchStream = new SoundTouchWaveStream(audioFileReader);
-			soundTouchStream.PitchSemiTones = (playingPrerendered ? 0f : (float)PitchSlider.Value);
-			soundTouchStream.TempoChange = (float)TempoSlider.Value;
+			soundTouchStream.PitchSemiTones = ((playingPrerendered || playingOriginalKeyOverride) ? 0f : (float)PitchSlider.Value);
+			soundTouchStream.TempoChange = (playingOriginalKeyOverride ? 0f : (float)TempoSlider.Value);
 			IWaveProvider source = soundTouchStream;
 			monitorBoost = new AudioMonitorBoostProvider(source, (float)VolumeSlider.Value);
 			monitorBoost.LevelUpdated += OnInstLevel;
@@ -2686,7 +2689,8 @@ public partial class MainWindow : Window
 			}
 			outputDevice.Init(monitorBoost);
 			outputDevice.Play();
-			NowPlayingText.Text = System.IO.Path.GetFileName(fileToPlay) + (playingPrerendered ? S(" [변조본]", " [rendered]") : "");
+			bool sliderOffset = (int)Math.Round(PitchSlider.Value) != 0 || (int)Math.Round(TempoSlider.Value) != 0;
+			NowPlayingText.Text = System.IO.Path.GetFileName(fileToPlay) + (playingPrerendered ? S(" [변조본]", " [rendered]") : ((playingOriginalKeyOverride && sliderOffset) ? S(" [원키]", " [original key]") : ""));
 			PlayPauseButton.Content = "⏸";
 			ProgressSlider.Maximum = audioFileReader.TotalTime.TotalSeconds;
 			TotalTimeText.Text = FormatTime(audioFileReader.TotalTime);
@@ -2721,6 +2725,13 @@ public partial class MainWindow : Window
 	{
 		if (soundTouchStream == null)
 		{
+			return;
+		}
+		if (playingOriginalKeyOverride)
+		{
+			playingOriginalKeyOverride = false;
+			soundTouchStream.PitchSemiTones = (float)PitchSlider.Value;
+			soundTouchStream.TempoChange = (float)TempoSlider.Value;
 			return;
 		}
 		int pitchNow = (int)Math.Round(PitchSlider.Value);
@@ -2779,6 +2790,164 @@ public partial class MainWindow : Window
 			PlayPauseButton.Content = "▶";
 			progressTimer.Stop();
 		}
+	}
+
+	private static bool IsRecordingFile(string path)
+	{
+		if (System.IO.Path.GetFileNameWithoutExtension(path).Contains("_REC_"))
+		{
+			return true;
+		}
+		string parent = System.IO.Path.GetFileName(System.IO.Path.GetDirectoryName(path) ?? "");
+		return parent == "녹음" || string.Equals(parent, "Recordings", StringComparison.OrdinalIgnoreCase);
+	}
+
+	private void PlaylistBox_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
+	{
+		DependencyObject dependencyObject = e.OriginalSource as DependencyObject;
+		while (dependencyObject != null && !(dependencyObject is ListBoxItem))
+		{
+			dependencyObject = VisualTreeHelper.GetParent(dependencyObject);
+		}
+		if (dependencyObject is ListBoxItem container)
+		{
+			int idx = PlaylistBox.ItemContainerGenerator.IndexFromContainer(container);
+			if (idx >= 0 && idx < playlist.Count)
+			{
+				PlaylistBox.SelectedIndex = idx;
+				ShowDerivedFilesMenu(container, playlist[idx]);
+				e.Handled = true;
+			}
+		}
+	}
+
+	private void LibraryBox_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
+	{
+		DependencyObject dependencyObject = e.OriginalSource as DependencyObject;
+		while (dependencyObject != null && !(dependencyObject is ListBoxItem))
+		{
+			dependencyObject = VisualTreeHelper.GetParent(dependencyObject);
+		}
+		if (dependencyObject is ListBoxItem container)
+		{
+			int idx = LibraryBox.ItemContainerGenerator.IndexFromContainer(container);
+			List<string> list = ((filteredLibraryFiles.Count > 0) ? filteredLibraryFiles : libraryFiles);
+			if (idx >= 0 && idx < list.Count)
+			{
+				LibraryBox.SelectedIndex = idx;
+				ShowDerivedFilesMenu(container, list[idx]);
+				e.Handled = true;
+			}
+		}
+	}
+
+	private void ShowDerivedFilesMenu(FrameworkElement anchor, string sourcePath)
+	{
+		string dir = System.IO.Path.GetDirectoryName(sourcePath);
+		if (dir == null || !Directory.Exists(dir))
+		{
+			return;
+		}
+		string parentName = System.IO.Path.GetFileName(dir);
+		if (parentName == "녹음" || string.Equals(parentName, "Recordings", StringComparison.OrdinalIgnoreCase))
+		{
+			dir = System.IO.Path.GetDirectoryName(dir) ?? dir;
+		}
+		string[] audioExts = new string[7] { ".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac", ".opus" };
+		List<string> versions = Directory.EnumerateFiles(dir).Where(f => audioExts.Contains(System.IO.Path.GetExtension(f).ToLower()) && !string.Equals(f, sourcePath, StringComparison.OrdinalIgnoreCase)).OrderBy(f => f).ToList();
+		string recDir = System.IO.Path.Combine(dir, "녹음");
+		List<string> recs = (Directory.Exists(recDir) ? Directory.EnumerateFiles(recDir).Where(f => audioExts.Contains(System.IO.Path.GetExtension(f).ToLower())).OrderByDescending(f => f).ToList() : new List<string>());
+		ContextMenu menu = new ContextMenu();
+		MenuItem openItem = new MenuItem
+		{
+			Header = S("📂 곡 폴더 열기", "📂 Open song folder")
+		};
+		string dirForOpen = dir;
+		openItem.Click += delegate
+		{
+			try
+			{
+				Process.Start(new ProcessStartInfo("explorer.exe", "\"" + dirForOpen + "\"")
+				{
+					UseShellExecute = true
+				});
+			}
+			catch
+			{
+			}
+		};
+		menu.Items.Add(openItem);
+		if (versions.Count > 0)
+		{
+			menu.Items.Add(new Separator());
+			menu.Items.Add(new MenuItem
+			{
+				Header = S($"다른 버전 ({versions.Count})", $"Other versions ({versions.Count})"),
+				IsEnabled = false,
+				FontWeight = FontWeights.SemiBold
+			});
+			foreach (string v in versions)
+			{
+				string cap = v;
+				MenuItem mi = new MenuItem
+				{
+					Header = System.IO.Path.GetFileName(v)
+				};
+				mi.Click += delegate
+				{
+					PlayFromMenu(cap);
+				};
+				menu.Items.Add(mi);
+			}
+		}
+		if (recs.Count > 0)
+		{
+			menu.Items.Add(new Separator());
+			MenuItem recRoot = new MenuItem
+			{
+				Header = S($"🎙 녹음 ({recs.Count})", $"🎙 Recordings ({recs.Count})")
+			};
+			foreach (string r in recs)
+			{
+				string cap = r;
+				MenuItem mi = new MenuItem
+				{
+					Header = System.IO.Path.GetFileName(r)
+				};
+				mi.Click += delegate
+				{
+					PlayFromMenu(cap);
+				};
+				recRoot.Items.Add(mi);
+			}
+			menu.Items.Add(recRoot);
+		}
+		if (versions.Count == 0 && recs.Count == 0)
+		{
+			menu.Items.Add(new MenuItem
+			{
+				Header = S("파생 파일 없음", "No derived files"),
+				IsEnabled = false
+			});
+		}
+		menu.PlacementTarget = anchor;
+		menu.IsOpen = true;
+	}
+
+	private void PlayFromMenu(string filePath)
+	{
+		if (!System.IO.File.Exists(filePath))
+		{
+			MessageBox.Show(S("파일을 찾을 수 없습니다: ", "File not found: ") + filePath);
+			return;
+		}
+		int idx = playlist.IndexOf(filePath);
+		if (idx < 0)
+		{
+			AddToPlaylist(filePath);
+			idx = playlist.Count - 1;
+		}
+		PlayTrack(idx);
 	}
 
 	private static string? FindPrerenderedPitchFile(string sourcePath, int pitch)

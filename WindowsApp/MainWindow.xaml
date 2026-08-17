@@ -498,7 +498,7 @@
         <Button Name="SavePlaylistBtn" Content="저장" Style="{StaticResource DarkButton}" Height="36" Padding="12,0" Margin="0,0,3,0" FontSize="12" Click="SavePlaylistBtn_Click" />
         <Button Name="LoadPlaylistBtn" Content="불러오기" Style="{StaticResource DarkButton}" Height="36" Padding="12,0" FontSize="12" Click="LoadPlaylistBtn_Click" />
       </StackPanel>
-      <ListBox Name="PlaylistBox" Grid.Row="2" Background="#2A2A2A" Foreground="#FFFFFFFF" BorderBrush="#444" SelectionMode="Extended" AllowDrop="True" VirtualizingPanel.IsVirtualizing="False" Drop="PlaylistBox_Drop" DragOver="PlaylistBox_DragOver" MouseDoubleClick="PlaylistBox_MouseDoubleClick" KeyDown="PlaylistBox_KeyDown" PreviewMouseLeftButtonDown="PlaylistBox_DragStart" PreviewMouseMove="PlaylistBox_DragMove">
+      <ListBox Name="PlaylistBox" Grid.Row="2" Background="#2A2A2A" Foreground="#FFFFFFFF" BorderBrush="#444" SelectionMode="Extended" AllowDrop="True" VirtualizingPanel.IsVirtualizing="False" Drop="PlaylistBox_Drop" DragOver="PlaylistBox_DragOver" MouseDoubleClick="PlaylistBox_MouseDoubleClick" KeyDown="PlaylistBox_KeyDown" PreviewMouseLeftButtonDown="PlaylistBox_DragStart" PreviewMouseMove="PlaylistBox_DragMove" MouseRightButtonUp="PlaylistBox_MouseRightButtonUp">
         <ItemsControl.ItemContainerStyle>
           <Style TargetType="{x:Type ListBoxItem}">
             <Setter Property="Foreground" Value="#FFFFFFFF" />
@@ -537,7 +537,7 @@
         <Button Name="LibraryRefreshBtn" Grid.Column="1" Content="↻" Style="{StaticResource DarkButton}" Width="34" Height="34" FontSize="13" FontWeight="Bold" ToolTip="파일 목록 갱신" Click="LibraryRefreshBtn_Click" />
       </Grid>
       <TextBox Name="LibrarySearchBox" Grid.Row="1" Background="#2A2A2A" Foreground="#AAA" BorderBrush="#444" CaretBrush="#FFFFFFFF" Padding="6,4" Margin="0,0,0,6" FontSize="12" TextChanged="LibrarySearchBox_TextChanged" />
-      <ListBox Name="LibraryBox" Grid.Row="2" Background="#2A2A2A" Foreground="#FFFFFFFF" BorderBrush="#444" SelectionMode="Extended" MouseDoubleClick="LibraryBox_MouseDoubleClick" PreviewMouseLeftButtonDown="LibraryBox_PreviewMouseLeftButtonDown" PreviewMouseMove="LibraryBox_PreviewMouseMove" PreviewMouseLeftButtonUp="LibraryBox_PreviewMouseLeftButtonUp">
+      <ListBox Name="LibraryBox" Grid.Row="2" Background="#2A2A2A" Foreground="#FFFFFFFF" BorderBrush="#444" SelectionMode="Extended" MouseDoubleClick="LibraryBox_MouseDoubleClick" PreviewMouseLeftButtonDown="LibraryBox_PreviewMouseLeftButtonDown" PreviewMouseMove="LibraryBox_PreviewMouseMove" PreviewMouseLeftButtonUp="LibraryBox_PreviewMouseLeftButtonUp" MouseRightButtonUp="LibraryBox_MouseRightButtonUp">
         <ItemsControl.ItemContainerStyle>
           <Style TargetType="{x:Type ListBoxItem}">
             <Setter Property="Foreground" Value="#FFFFFFFF" />
