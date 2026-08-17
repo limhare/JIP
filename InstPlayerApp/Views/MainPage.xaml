@@ -204,12 +204,23 @@
                                     Clicked="OnLyricsEditDone" />
                         </Grid>
                         <ScrollView Grid.Row="1">
-                            <Editor x:Name="LyricsEditorNarrow"
-                                    Text="{Binding LyricsText}"
-                                    FontSize="{Binding LyricsFontSize}"
-                                    TextColor="#E1E1E1" BackgroundColor="#252526"
-                                    IsReadOnly="{Binding LyricsEditMode, Converter={StaticResource InvertBool}}"
-                                    AutoSize="TextChanges" />
+                            <Grid>
+                                <Editor x:Name="LyricsEditorNarrow"
+                                        Text="{Binding LyricsText}"
+                                        FontSize="{Binding LyricsFontSize}"
+                                        TextColor="#E1E1E1" BackgroundColor="#252526"
+                                        IsVisible="{Binding LyricsEditMode}"
+                                        AutoSize="TextChanges" />
+                                <Label Text="{Binding LyricsText}"
+                                       FontSize="{Binding LyricsFontSize}"
+                                       TextColor="#E1E1E1" Padding="4"
+                                       LineBreakMode="WordWrap"
+                                       IsVisible="{Binding LyricsEditMode, Converter={StaticResource InvertBool}}">
+                                    <Label.GestureRecognizers>
+                                        <TapGestureRecognizer Command="{Binding ToggleLyricsFullscreenCommand}" />
+                                    </Label.GestureRecognizers>
+                                </Label>
+                            </Grid>
                         </ScrollView>
                     </Grid>
                     <!-- YouTube Download -->
@@ -382,12 +393,23 @@
                                     Clicked="OnLyricsEditDone" />
                         </Grid>
                         <ScrollView Grid.Row="1">
-                            <Editor x:Name="LyricsEditorWide"
-                                    Text="{Binding LyricsText}"
-                                    FontSize="{Binding LyricsFontSize}"
-                                    TextColor="#E1E1E1" BackgroundColor="#252526"
-                                    IsReadOnly="{Binding LyricsEditMode, Converter={StaticResource InvertBool}}"
-                                    AutoSize="TextChanges" />
+                            <Grid>
+                                <Editor x:Name="LyricsEditorWide"
+                                        Text="{Binding LyricsText}"
+                                        FontSize="{Binding LyricsFontSize}"
+                                        TextColor="#E1E1E1" BackgroundColor="#252526"
+                                        IsVisible="{Binding LyricsEditMode}"
+                                        AutoSize="TextChanges" />
+                                <Label Text="{Binding LyricsText}"
+                                       FontSize="{Binding LyricsFontSize}"
+                                       TextColor="#E1E1E1" Padding="4"
+                                       LineBreakMode="WordWrap"
+                                       IsVisible="{Binding LyricsEditMode, Converter={StaticResource InvertBool}}">
+                                    <Label.GestureRecognizers>
+                                        <TapGestureRecognizer Command="{Binding ToggleLyricsFullscreenCommand}" />
+                                    </Label.GestureRecognizers>
+                                </Label>
+                            </Grid>
                         </ScrollView>
                     </Grid>
                     <!-- YouTube -->
@@ -417,7 +439,7 @@
                         <!-- Pitch -->
                         <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,4">
                             <Button Grid.Column="0" Text="-" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
-                                    WidthRequest="60" HeightRequest="60" FontSize="28" Padding="0"
+                                    WidthRequest="{OnIdiom Phone=46, Default=60}" HeightRequest="{OnIdiom Phone=46, Default=60}" FontSize="{OnIdiom Phone=20, Default=28}" Padding="0"
                                     VerticalOptions="Center" Command="{Binding PitchDownCommand}" />
                             <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="0">
                                 <Label Text="{Binding PitchText}" TextColor="#4A9EFF" FontSize="12"
@@ -432,16 +454,16 @@
                                 </Grid>
                             </VerticalStackLayout>
                             <Button Grid.Column="2" Text="+" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
-                                    WidthRequest="60" HeightRequest="60" FontSize="28" Padding="0"
+                                    WidthRequest="{OnIdiom Phone=46, Default=60}" HeightRequest="{OnIdiom Phone=46, Default=60}" FontSize="{OnIdiom Phone=20, Default=28}" Padding="0"
                                     VerticalOptions="Center" Command="{Binding PitchUpCommand}" />
                             <Button Grid.Column="3" Text="RST" BackgroundColor="#2D2D30" TextColor="#4EC9B0"
-                                    HeightRequest="60" FontSize="14" Padding="0"
+                                    HeightRequest="{OnIdiom Phone=46, Default=60}" FontSize="{OnIdiom Phone=12, Default=14}" Padding="0"
                                     VerticalOptions="Center" Command="{Binding PitchResetCommand}" />
                         </Grid>
                         <!-- Tempo -->
                         <Grid ColumnDefinitions="Auto,*,Auto,Auto">
                             <Button Grid.Column="0" Text="-" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
-                                    WidthRequest="60" HeightRequest="60" FontSize="28" Padding="0"
+                                    WidthRequest="{OnIdiom Phone=46, Default=60}" HeightRequest="{OnIdiom Phone=46, Default=60}" FontSize="{OnIdiom Phone=20, Default=28}" Padding="0"
                                     VerticalOptions="Center" Command="{Binding TempoDownCommand}" />
                             <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="0">
                                 <Label Text="{Binding TempoText}" TextColor="#4A9EFF" FontSize="12"
@@ -455,10 +477,10 @@
                                 </Grid>
                             </VerticalStackLayout>
                             <Button Grid.Column="2" Text="+" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
-                                    WidthRequest="60" HeightRequest="60" FontSize="28" Padding="0"
+                                    WidthRequest="{OnIdiom Phone=46, Default=60}" HeightRequest="{OnIdiom Phone=46, Default=60}" FontSize="{OnIdiom Phone=20, Default=28}" Padding="0"
                                     VerticalOptions="Center" Command="{Binding TempoUpCommand}" />
                             <Button Grid.Column="3" Text="RST" BackgroundColor="#2D2D30" TextColor="#4EC9B0"
-                                    HeightRequest="60" FontSize="14" Padding="0"
+                                    HeightRequest="{OnIdiom Phone=46, Default=60}" FontSize="{OnIdiom Phone=12, Default=14}" Padding="0"
                                     VerticalOptions="Center" Command="{Binding TempoResetCommand}" />
                         </Grid>
                         <!-- Volume -->
@@ -525,18 +547,18 @@
                                    FontSize="11" VerticalOptions="Center" />
                         </Grid>
                         <!-- Main Playback Controls -->
-                        <Grid ColumnDefinitions="*,*,1.6*,*,*" ColumnSpacing="4" HeightRequest="72">
+                        <Grid ColumnDefinitions="*,*,1.6*,*,*" ColumnSpacing="4" HeightRequest="{OnIdiom Phone=54, Default=72}">
                             <Button Grid.Column="0" Text="{Binding RepeatIcon}" FontSize="15" Padding="0"
                                     BackgroundColor="{Binding RepeatBgColor}"
                                     TextColor="White" CornerRadius="36"
                                     Command="{Binding CycleRepeatCommand}" />
-                            <Button Grid.Column="1" Text="&#x23EE;" FontSize="26" Padding="0"
+                            <Button Grid.Column="1" Text="&#x23EE;" FontSize="{OnIdiom Phone=20, Default=26}" Padding="0"
                                     BackgroundColor="#2D2D30" TextColor="#E1E1E1" CornerRadius="36"
                                     Command="{Binding PreviousTrackCommand}" />
-                            <Button Grid.Column="2" Text="{Binding PlayPauseIcon}" FontSize="34" Padding="0"
+                            <Button Grid.Column="2" Text="{Binding PlayPauseIcon}" FontSize="{OnIdiom Phone=24, Default=34}" Padding="0"
                                     BackgroundColor="#4A9EFF" TextColor="White" CornerRadius="36"
                                     Command="{Binding PlayPauseCommand}" />
-                            <Button Grid.Column="3" Text="&#x23ED;" FontSize="26" Padding="0"
+                            <Button Grid.Column="3" Text="&#x23ED;" FontSize="{OnIdiom Phone=20, Default=26}" Padding="0"
                                     BackgroundColor="#2D2D30" TextColor="#E1E1E1" CornerRadius="36"
                                     Command="{Binding NextTrackCommand}" />
                             <Button Grid.Column="4" Text="&#x25A0;" FontSize="24" Padding="0"
@@ -544,7 +566,7 @@
                                     Command="{Binding StopPlaybackCommand}" />
                         </Grid>
                         <!-- Toggles + AB -->
-                        <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="4" HeightRequest="58">
+                        <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="4" HeightRequest="{OnIdiom Phone=46, Default=58}">
                             <Button Grid.Column="0" Text="Random" FontSize="12" Padding="0"
                                     BackgroundColor="{Binding ShuffleMode, Converter={StaticResource BoolToActiveColor}}"
                                     TextColor="White" CornerRadius="29"
@@ -588,7 +610,7 @@
             <!-- Pitch / Tempo -->
             <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,4">
                 <Button Grid.Column="0" Text="-" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
-                        WidthRequest="72" HeightRequest="72" FontSize="32" Padding="0"
+                        WidthRequest="{OnIdiom Phone=52, Default=72}" HeightRequest="{OnIdiom Phone=52, Default=72}" FontSize="{OnIdiom Phone=24, Default=32}" Padding="0"
                         VerticalOptions="Center"
                         Command="{Binding PitchDownCommand}" />
                 <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="0">
@@ -607,18 +629,18 @@
                     </Grid>
                 </VerticalStackLayout>
                 <Button Grid.Column="2" Text="+" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
-                        WidthRequest="72" HeightRequest="72" FontSize="32" Padding="0"
+                        WidthRequest="{OnIdiom Phone=52, Default=72}" HeightRequest="{OnIdiom Phone=52, Default=72}" FontSize="{OnIdiom Phone=24, Default=32}" Padding="0"
                         VerticalOptions="Center"
                         Command="{Binding PitchUpCommand}" />
                 <Button Grid.Column="3" Text="RST" BackgroundColor="#2D2D30" TextColor="#4EC9B0"
-                        HeightRequest="72" FontSize="18" Padding="0"
+                        HeightRequest="{OnIdiom Phone=52, Default=72}" FontSize="{OnIdiom Phone=14, Default=18}" Padding="0"
                         VerticalOptions="Center"
                         Command="{Binding PitchResetCommand}" />
             </Grid>
 
             <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,0,0,4">
                 <Button Grid.Column="0" Text="-" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
-                        WidthRequest="72" HeightRequest="72" FontSize="32" Padding="0"
+                        WidthRequest="{OnIdiom Phone=52, Default=72}" HeightRequest="{OnIdiom Phone=52, Default=72}" FontSize="{OnIdiom Phone=24, Default=32}" Padding="0"
                         VerticalOptions="Center"
                         Command="{Binding TempoDownCommand}" />
                 <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="0">
@@ -636,11 +658,11 @@
                     </Grid>
                 </VerticalStackLayout>
                 <Button Grid.Column="2" Text="+" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
-                        WidthRequest="72" HeightRequest="72" FontSize="32" Padding="0"
+                        WidthRequest="{OnIdiom Phone=52, Default=72}" HeightRequest="{OnIdiom Phone=52, Default=72}" FontSize="{OnIdiom Phone=24, Default=32}" Padding="0"
                         VerticalOptions="Center"
                         Command="{Binding TempoUpCommand}" />
                 <Button Grid.Column="3" Text="RST" BackgroundColor="#2D2D30" TextColor="#4EC9B0"
-                        HeightRequest="72" FontSize="18" Padding="0"
+                        HeightRequest="{OnIdiom Phone=52, Default=72}" FontSize="{OnIdiom Phone=14, Default=18}" Padding="0"
                         VerticalOptions="Center"
                         Command="{Binding TempoResetCommand}" />
             </Grid>
@@ -714,18 +736,18 @@
             </Grid>
 
             <!-- Main Playback Controls (Row 1) -->
-            <Grid ColumnDefinitions="*,*,1.6*,*,*" ColumnSpacing="6" HeightRequest="84">
+            <Grid ColumnDefinitions="*,*,1.6*,*,*" ColumnSpacing="6" HeightRequest="{OnIdiom Phone=56, Default=84}">
                 <Button Grid.Column="0" Text="{Binding RepeatIcon}" FontSize="18" Padding="0"
                         BackgroundColor="{Binding RepeatBgColor}"
                         TextColor="White" CornerRadius="42"
                         Command="{Binding CycleRepeatCommand}" />
-                <Button Grid.Column="1" Text="&#x23EE;" FontSize="30" Padding="0"
+                <Button Grid.Column="1" Text="&#x23EE;" FontSize="{OnIdiom Phone=22, Default=30}" Padding="0"
                         BackgroundColor="#2D2D30" TextColor="#E1E1E1" CornerRadius="42"
                         Command="{Binding PreviousTrackCommand}" />
-                <Button Grid.Column="2" Text="{Binding PlayPauseIcon}" FontSize="40" Padding="0"
+                <Button Grid.Column="2" Text="{Binding PlayPauseIcon}" FontSize="{OnIdiom Phone=28, Default=40}" Padding="0"
                         BackgroundColor="#4A9EFF" TextColor="White" CornerRadius="42"
                         Command="{Binding PlayPauseCommand}" />
-                <Button Grid.Column="3" Text="&#x23ED;" FontSize="30" Padding="0"
+                <Button Grid.Column="3" Text="&#x23ED;" FontSize="{OnIdiom Phone=22, Default=30}" Padding="0"
                         BackgroundColor="#2D2D30" TextColor="#E1E1E1" CornerRadius="42"
                         Command="{Binding NextTrackCommand}" />
                 <Button Grid.Column="4" Text="&#x25A0;" FontSize="28" Padding="0"
@@ -764,5 +786,25 @@
                         Command="{Binding ClearABCommand}" />
             </Grid>
         </VerticalStackLayout>
+
+        <!-- ═══ 가사 전체화면 오버레이 (탭하면 닫힘, 상하 스크롤 가능) ═══ -->
+        <Grid Grid.RowSpan="3" IsVisible="{Binding IsLyricsFullscreen}" BackgroundColor="#1E1E1E">
+            <Grid.GestureRecognizers>
+                <TapGestureRecognizer Command="{Binding ToggleLyricsFullscreenCommand}" />
+            </Grid.GestureRecognizers>
+            <ScrollView>
+                <VerticalStackLayout Padding="28,24,28,60">
+                    <VerticalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding ToggleLyricsFullscreenCommand}" />
+                    </VerticalStackLayout.GestureRecognizers>
+                    <Label Text="{Binding NowPlayingText}" TextColor="#4A9EFF" FontSize="14"
+                           FontAttributes="Bold" Margin="0,0,0,16" HorizontalOptions="Center" />
+                    <Label Text="{Binding LyricsText}"
+                           FontSize="{Binding LyricsFontSize}"
+                           TextColor="#E1E1E1" LineBreakMode="WordWrap"
+                           HorizontalOptions="Center" HorizontalTextAlignment="Center" />
+                </VerticalStackLayout>
+            </ScrollView>
+        </Grid>
     </Grid>
 </ContentPage>

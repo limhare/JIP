@@ -525,6 +525,17 @@ public partial class MainViewModel : ObservableObject, IDisposable
 #endif
     }
 
+    // ── Lyrics fullscreen ──
+
+    [ObservableProperty] private bool isLyricsFullscreen;
+
+    [RelayCommand]
+    private void ToggleLyricsFullscreen()
+    {
+        if (LyricsEditMode) return; // 편집 중엔 전체화면 진입 안 함
+        IsLyricsFullscreen = !IsLyricsFullscreen;
+    }
+
     // ── Recording (마이크 / 반주+마이크) ──
 
     [ObservableProperty] private bool isRecording;
