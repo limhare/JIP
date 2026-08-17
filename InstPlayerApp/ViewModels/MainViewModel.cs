@@ -574,6 +574,16 @@ public partial class MainViewModel : ObservableObject, IDisposable
 #endif
     }
 
+    // 녹음 대상 곡: 재생 중인 곡 → 탭으로 선택된 곡 → 곡이 하나뿐이면 그 곡
+    private int ResolveRecordTargetIndex()
+    {
+        if (CurrentIndex >= 0 && CurrentIndex < Playlist.Count) return CurrentIndex;
+        var sel = Playlist.FirstOrDefault(p => p.IsSelected);
+        if (sel != null) return Playlist.IndexOf(sel);
+        if (Playlist.Count == 1) return 0;
+        return -1;
+    }
+
 #if ANDROID
     private async Task StartRecordingAsync()
     {
@@ -591,12 +601,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         if (RecordMixMode)
         {
-            if (CurrentIndex < 0 || CurrentIndex >= Playlist.Count)
+            int targetIdx = ResolveRecordTargetIndex();
+            if (targetIdx < 0)
             {
                 await Shell.Current.DisplayAlert("녹음", "반주+마이크 녹음은 곡을 먼저 선택해야 합니다.", "확인");
                 return;
             }
-            string p = Playlist[CurrentIndex].FilePath;
+            string p = Playlist[targetIdx].FilePath;
             if (p.StartsWith("content://") || p.StartsWith("http"))
             {
                 await Shell.Current.DisplayAlert("녹음",
@@ -606,14 +617,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
             _recMrPath = p;
             if (_audio.Status != PlaybackStatus.Playing)
             {
-                if (_audio.Status == PlaybackStatus.Paused)
+                if (_audio.Status == PlaybackStatus.Paused && targetIdx == CurrentIndex)
                 {
                     _audio.Play();
                     PlayPauseIcon = "▮▮";
                 }
                 else
                 {
-                    PlayTrack(CurrentIndex);
+                    PlayTrack(targetIdx);
                 }
             }
         }
@@ -663,14 +674,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
         try
         {
             string basisPath = _recMrPath;
-            if (string.IsNullOrEmpty(basisPath) && CurrentIndex >= 0 && CurrentIndex < Playlist.Count)
+            int basisIdx = ResolveRecordTargetIndex();
+            if (string.IsNullOrEmpty(basisPath) && basisIdx >= 0)
             {
-                string cp = Playlist[CurrentIndex].FilePath;
+                string cp = Playlist[basisIdx].FilePath;
                 if (!cp.StartsWith("content://") && !cp.StartsWith("http")) basisPath = cp;
             }
             string songBase = !string.IsNullOrEmpty(basisPath)
                 ? Path.GetFileNameWithoutExtension(basisPath)
-                : ((CurrentIndex >= 0 && CurrentIndex < Playlist.Count) ? Playlist[CurrentIndex].DisplayName : "untitled");
+                : ((basisIdx >= 0) ? Playlist[basisIdx].DisplayName : "untitled");
             foreach (char c in Path.GetInvalidFileNameChars()) songBase = songBase.Replace(c, '_');
 
             string outDir = !string.IsNullOrEmpty(basisPath)
