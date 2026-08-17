@@ -35,4 +35,8 @@ internal record AppSettings
 	public int MicDeviceNumber { get; init; }
 
 	public List<string> DownloadedFiles { get; init; } = new List<string>();
+
+	public string MusicRootPath { get; init; } = "";
+
+	public bool AutoPlayPitchFile { get; init; } = true;
 }
