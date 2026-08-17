@@ -692,20 +692,19 @@ public partial class MainViewModel : ObservableObject, IDisposable
             string ts = DateTime.Now.ToString("yyMMdd_HHmmss");
             string outputPath = Path.Combine(outDir, $"{ts}_REC_{songBase}.mp3");
 
-            var prog = new Progress<int>(p => RecordStatusText = $"저장 중... {p}%");
+            // 여러 단계를 하나의 0~100% 진행률로 합쳐 표시
+            IProgress<int> StageProg(int from, int to) =>
+                new Progress<int>(p => RecordStatusText = $"저장 중... {from + (to - from) * Math.Clamp(p, 0, 100) / 100}%");
             if (!string.IsNullOrEmpty(_recMrPath))
             {
                 string tmpMr    = Path.Combine(FileSystem.CacheDirectory, "rec_mr.mp3");
                 string tmpMrWav = Path.Combine(FileSystem.CacheDirectory, "rec_mr.wav");
                 string tmpMix   = Path.Combine(FileSystem.CacheDirectory, "rec_mix.wav");
-                RecordStatusText = "반주 렌더링...";
-                await _audio.ExportMp3Async(_recMrPath, _recPitch, _recTempo, tmpMr, prog);
-                RecordStatusText = "반주 디코딩...";
-                await _audio.DecodeToWavAsync(tmpMr, tmpMrWav, prog);
-                RecordStatusText = "믹싱...";
+                await _audio.ExportMp3Async(_recMrPath, _recPitch, _recTempo, tmpMr, StageProg(0, 40));
+                await _audio.DecodeToWavAsync(tmpMr, tmpMrWav, StageProg(40, 65));
+                RecordStatusText = "저장 중... 68%";
                 await Task.Run(() => Platforms.Android.WavMixer.Mix(tmpMrWav, micWav, tmpMix, _recMrOffsetMs));
-                RecordStatusText = "인코딩...";
-                await _audio.ExportMp3Async(tmpMix, 0, 0, outputPath, prog);
+                await _audio.ExportMp3Async(tmpMix, 0, 0, outputPath, StageProg(70, 100));
                 foreach (string t in new[] { tmpMr, tmpMrWav, tmpMix })
                 {
                     try { File.Delete(t); } catch { }
@@ -713,8 +712,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             }
             else
             {
-                RecordStatusText = "인코딩...";
-                await _audio.ExportMp3Async(micWav, 0, 0, outputPath, prog);
+                await _audio.ExportMp3Async(micWav, 0, 0, outputPath, StageProg(0, 100));
             }
             try { File.Delete(micWav); } catch { }
 
