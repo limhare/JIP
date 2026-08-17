@@ -48,6 +48,7 @@ public partial class MainPage : ContentPage
     {
         base.OnDisappearing();
         ShareReceiver.UrlShared -= OnUrlShared;
+        _vm.SaveCurrentLyrics(); // 편집 중이던 가사 유실 방지
         _vm.SaveSettings();
     }
 

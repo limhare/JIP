@@ -925,27 +925,50 @@ public partial class MainViewModel : ObservableObject, IDisposable
         return Path.Combine(dir, $"{name}_{hash}.txt");
     }
 
-    private void LoadLyrics(string filePath)
+    // 사용자가 편집 모드에서 실제로 고친 경우에만 저장 — 빈 텍스트가 기존 가사를 덮어쓰는 사고 방지
+    private bool _lyricsDirty;
+    private bool _suppressLyricsDirty;
+
+    partial void OnLyricsTextChanged(string value)
     {
-        var lf = LyricsFilePath(filePath);
-        if (File.Exists(lf))
-        {
-            LyricsText = File.ReadAllText(lf);
-            return;
-        }
-        // 별도 파일 없으면 MP3 태그에서 읽기 (하위 호환)
-        try
-        {
-            using var tagFile = TagLib.File.Create(filePath);
-            LyricsText = tagFile.Tag.Lyrics ?? "";
-        }
-        catch { LyricsText = ""; }
+        if (LyricsEditMode && !_suppressLyricsDirty) _lyricsDirty = true;
     }
 
-    private void SaveCurrentLyrics()
+    private void LoadLyrics(string filePath)
     {
+        _suppressLyricsDirty = true;
+        try
+        {
+            var lf = LyricsFilePath(filePath);
+            if (File.Exists(lf))
+            {
+                LyricsText = File.ReadAllText(lf);
+                return;
+            }
+            // 별도 파일 없으면 MP3 태그에서 읽기 (하위 호환)
+            try
+            {
+                using var tagFile = TagLib.File.Create(filePath);
+                LyricsText = tagFile.Tag.Lyrics ?? "";
+            }
+            catch { LyricsText = ""; }
+        }
+        finally
+        {
+            _suppressLyricsDirty = false;
+            _lyricsDirty = false;
+        }
+    }
+
+    public void SaveCurrentLyrics()
+    {
+        if (!_lyricsDirty) return;
         if (CurrentIndex < 0 || CurrentIndex >= Playlist.Count) return;
-        try { File.WriteAllText(LyricsFilePath(Playlist[CurrentIndex].FilePath), LyricsText); }
+        try
+        {
+            File.WriteAllText(LyricsFilePath(Playlist[CurrentIndex].FilePath), LyricsText);
+            _lyricsDirty = false;
+        }
         catch { }
     }
 
