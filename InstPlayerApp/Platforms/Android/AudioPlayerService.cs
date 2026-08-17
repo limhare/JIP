@@ -171,6 +171,40 @@ public class AudioPlayerService : IAudioPlayerService
         return await _exporter.DecodeToWavAsync(inputPath, outputWavPath, progress, ct);
     }
 
+    // 재생 중 출력 PCM(피치/템포 적용본)을 WAV로 탭 — SoundTouch 체인의 PcmTapProcessor 제어
+    public bool StartOutputCapture(string wavPath)
+    {
+        try
+        {
+            var cls = global::Android.Runtime.JNIEnv.FindClass("com/instplayer/app/PcmTapProcessor");
+            var mid = global::Android.Runtime.JNIEnv.GetStaticMethodID(cls, "startTap", "(Ljava/lang/String;)Z");
+            using var jPath = new Java.Lang.String(wavPath);
+            return global::Android.Runtime.JNIEnv.CallStaticBooleanMethod(cls, mid,
+                new global::Android.Runtime.JValue(jPath));
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public string StopOutputCapture()
+    {
+        try
+        {
+            var cls = global::Android.Runtime.JNIEnv.FindClass("com/instplayer/app/PcmTapProcessor");
+            var mid = global::Android.Runtime.JNIEnv.GetStaticMethodID(cls, "stopTap", "()Ljava/lang/String;");
+            nint h = global::Android.Runtime.JNIEnv.CallStaticObjectMethod(cls, mid);
+            return h != nint.Zero
+                ? global::Android.Runtime.JNIEnv.GetString(h, global::Android.Runtime.JniHandleOwnership.TransferLocalRef) ?? ""
+                : "";
+        }
+        catch
+        {
+            return "";
+        }
+    }
+
     internal void OnStateEnded()
     {
         Status = PlaybackStatus.Stopped;

@@ -575,6 +575,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private double _recMrOffsetMs;
     private int _recPitch;
     private float _recTempo;
+    private bool _recTapActive;   // 출력 탭(현재 나오는 소리 복사) 사용 여부
 #endif
 
     [RelayCommand]
@@ -652,6 +653,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
             }
         }
 
+        // 믹스 모드: 출력 탭 시작 (지금 이어폰으로 나가는 소리 그대로 기록)
+        _recTapActive = false;
+        if (RecordMixMode)
+        {
+            string tapPath = Path.Combine(FileSystem.CacheDirectory, "rec_tap.wav");
+            _recTapActive = _audio.StartOutputCapture(tapPath);
+        }
         try
         {
             _recMicPath = Path.Combine(FileSystem.CacheDirectory, $"rec_mic_{DateTime.Now:yyMMdd_HHmmss}.wav");
@@ -660,13 +668,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
         catch (Exception ex)
         {
+            if (_recTapActive) { _audio.StopOutputCapture(); _recTapActive = false; }
             _micRecorder = null;
             await Shell.Current.DisplayAlert("녹음 시작 실패", ex.Message, "확인");
             return;
         }
         if (RecordMixMode)
         {
-            _recMrOffsetMs = _audio.Position.TotalMilliseconds; // 마이크 시작 직후 반주 위치 (싱크 기준)
+            _recMrOffsetMs = _audio.Position.TotalMilliseconds; // 폴백(구방식) 정렬용 반주 위치
         }
         IsRecording = true;
         RecordButtonText = "■ 중지";
@@ -685,6 +694,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             _micRecorder.Dispose();
             _micRecorder = null;
+        }
+        string tapWav = "";
+        if (_recTapActive)
+        {
+            tapWav = _audio.StopOutputCapture();
+            _recTapActive = false;
         }
         if (_audio.Status == PlaybackStatus.Playing)
         {
@@ -718,8 +733,21 @@ public partial class MainViewModel : ObservableObject, IDisposable
             // 여러 단계를 하나의 0~100% 진행률로 합쳐 표시
             IProgress<int> StageProg(int from, int to) =>
                 new Progress<int>(p => RecordStatusText = $"저장 중... {from + (to - from) * Math.Clamp(p, 0, 100) / 100}%");
-            if (!string.IsNullOrEmpty(_recMrPath))
+            if (!string.IsNullOrEmpty(_recMrPath) && !string.IsNullOrEmpty(tapWav) && File.Exists(tapWav) && new FileInfo(tapWav).Length > 44)
             {
+                // 신방식: 재생 중 탭한 출력(현재 나온 소리 그대로) + 마이크 → 믹스 → 인코딩
+                string tmpMix = Path.Combine(FileSystem.CacheDirectory, "rec_mix.wav");
+                RecordStatusText = "저장 중... 10%";
+                await Task.Run(() => Platforms.Android.WavMixer.Mix(tapWav, micWav, tmpMix, 0, RecordSyncMs));
+                await _audio.ExportMp3Async(tmpMix, 0, 0, outputPath, StageProg(20, 100));
+                foreach (string t in new[] { tapWav, tmpMix })
+                {
+                    try { File.Delete(t); } catch { }
+                }
+            }
+            else if (!string.IsNullOrEmpty(_recMrPath))
+            {
+                // 폴백(구방식): 반주를 다시 렌더링해서 위치 계산으로 정렬
                 string tmpMr    = Path.Combine(FileSystem.CacheDirectory, "rec_mr.mp3");
                 string tmpMrWav = Path.Combine(FileSystem.CacheDirectory, "rec_mr.wav");
                 string tmpMix   = Path.Combine(FileSystem.CacheDirectory, "rec_mix.wav");

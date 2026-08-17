@@ -25,6 +25,8 @@ public interface IAudioPlayerService
     Task<string> DecodeToWavAsync(string inputPath, string outputWavPath,
                                   IProgress<int>? progress = null,
                                   CancellationToken ct = default);
+    bool StartOutputCapture(string wavPath);
+    string StopOutputCapture();
     void Dispose();
 
     event Action? PlaybackEnded;

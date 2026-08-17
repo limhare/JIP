@@ -27,7 +27,8 @@ public class SoundTouchRenderersFactory extends DefaultRenderersFactory {
 
         return new DefaultAudioSink.Builder(context)
                 .setEnableFloatOutput(true) // Float output needed for SoundTouch
-                .setAudioProcessors(new AudioProcessor[]{soundTouchProcessor})
+                // PcmTapProcessor: SoundTouch 이후(=실제 출력되는) PCM을 녹음용으로 탭
+                .setAudioProcessors(new AudioProcessor[]{soundTouchProcessor, new PcmTapProcessor()})
                 .build();
     }
 }

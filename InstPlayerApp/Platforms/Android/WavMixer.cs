@@ -14,7 +14,9 @@ internal static class WavMixer
         public long Frames => Samples.LongLength / Math.Max(1, Channels);
     }
 
-    public static void Mix(string mrWavPath, string micWavPath, string outputWavPath, double mrOffsetMs)
+    /// <param name="mrOffsetMs">반주 앞부분을 건너뛸 ms (구방식 위치 정렬용, 탭 방식은 0)</param>
+    /// <param name="micSkipMs">마이크 앞부분을 건너뛸 ms (출력+입력 지연 보정 — 목소리를 앞으로 당김)</param>
+    public static void Mix(string mrWavPath, string micWavPath, string outputWavPath, double mrOffsetMs, double micSkipMs = 0)
     {
         WavData mr = Load(mrWavPath);
         WavData mic = Load(micWavPath);
@@ -30,8 +32,9 @@ internal static class WavMixer
 
         int outCh = mr.Channels;
         long mrSkip = (long)(mrOffsetMs / 1000.0 * mr.SampleRate);
+        long micSkip = Math.Max(0, (long)(micSkipMs / 1000.0 * mr.SampleRate));
         long mrFrames = Math.Max(0, mr.Frames - mrSkip);
-        long micFrames = micMono.LongLength;
+        long micFrames = Math.Max(0, micMono.LongLength - micSkip);
         // 결과물 길이 = 마이크 녹음 길이 (반주는 그 구간만큼만 사용)
         long frames = micFrames;
 
@@ -42,7 +45,8 @@ internal static class WavMixer
 
         for (long f = 0; f < frames; f++)
         {
-            int micVal = (f < micFrames) ? micMono[f] : 0;
+            long micIdx = f + micSkip;
+            int micVal = (micIdx < micMono.LongLength) ? micMono[micIdx] : 0;
             for (int c = 0; c < outCh; c++)
             {
                 long mrIdx = (mrSkip + f) * mr.Channels + Math.Min(c, mr.Channels - 1);
