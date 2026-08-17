@@ -307,11 +307,6 @@ public partial class MainWindow : Window
 
 	private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
 	{
-		if (showLyrics)
-		{
-			double pixels = Math.Max(100.0, e.NewSize.Width - 640.0 - 5.0 - (double)(showPlaylist ? 320 : 0) - (double)(showLibrary ? 320 : 0));
-			LyricsColumn.Width = new GridLength(pixels);
-		}
 	}
 
 	private void LyricsSplitter_DragDelta(object sender, DragDeltaEventArgs e)
@@ -319,9 +314,10 @@ public partial class MainWindow : Window
 		double val = (LyricsColumn.Width.IsAbsolute ? LyricsColumn.Width.Value : LyricsColumn.ActualWidth);
 		val = Math.Max(100.0, val);
 		LyricsColumn.Width = new GridLength(val);
-		PlaylistColumn.Width = new GridLength(showPlaylist ? 320 : 0);
-		LibraryColumn.Width = new GridLength(showLibrary ? 320 : 0);
-		base.Width = 640.0 + val + 5.0 + (double)(showPlaylist ? 320 : 0) + (double)(showLibrary ? 320 : 0);
+		if (showPlaylist)
+		{
+			PlaylistColumn.Width = new GridLength(320.0);
+		}
 	}
 
 	private void LoadSettings()
@@ -418,14 +414,20 @@ public partial class MainWindow : Window
 	private void UpdatePanelVisibility()
 	{
 		PlaylistColumn.Width = (showPlaylist ? new GridLength(320.0) : new GridLength(0.0));
-		LibraryColumn.Width = (showLibrary ? new GridLength(320.0) : new GridLength(0.0));
-		LyricsColumn.Width = (showLyrics ? new GridLength(320.0) : new GridLength(0.0));
+		PlaylistColumn.MinWidth = (showPlaylist ? 150.0 : 0.0);
+		LibraryColumn.Width = (showLibrary ? new GridLength(1.0, GridUnitType.Star) : new GridLength(0.0));
+		LibraryColumn.MinWidth = (showLibrary ? 240.0 : 0.0);
+		bool librarySplit = showLibrary && showPlaylist;
+		LibrarySplitterColumn.Width = (librarySplit ? new GridLength(5.0) : new GridLength(0.0));
+		LibrarySplitter.Visibility = (librarySplit ? Visibility.Visible : Visibility.Collapsed);
+		LyricsColumn.Width = (showLyrics ? ((!showLibrary) ? new GridLength(1.0, GridUnitType.Star) : new GridLength(320.0)) : new GridLength(0.0));
+		LyricsColumn.MinWidth = (showLyrics ? 100.0 : 0.0);
 		LyricsSplitterColumn.Width = (showLyrics ? new GridLength(5.0) : new GridLength(0.0));
 		LyricsSplitter.Visibility = ((!showLyrics) ? Visibility.Collapsed : Visibility.Visible);
 		TogglePlaylistBtn.Style = (showPlaylist ? ((Style)base.Resources["ActiveButton"]) : ((Style)base.Resources["DarkButton"]));
 		ToggleLibraryBtn.Style = (showLibrary ? ((Style)base.Resources["ActiveButton"]) : ((Style)base.Resources["DarkButton"]));
 		ToggleLyricsBtn.Style = (showLyrics ? ((Style)base.Resources["ActiveButton"]) : ((Style)base.Resources["DarkButton"]));
-		base.Width = 710 + (showPlaylist ? 320 : 0) + (showLibrary ? 320 : 0) + (showLyrics ? 325 : 0);
+		base.Width = 710 + (showPlaylist ? 320 : 0) + (showLibrary ? 320 : 0) + (showLyrics ? 325 : 0) + (librarySplit ? 5 : 0);
 	}
 
 	private void TogglePlaylistBtn_Click(object sender, RoutedEventArgs e)
