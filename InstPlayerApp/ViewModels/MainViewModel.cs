@@ -130,6 +130,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         _audio = audio;
         _settings = AppSettings.Load();
+        MigrateToSongFolders();
         ApplySettings();
 
         Playlist.CollectionChanged += (_, e) =>
@@ -925,6 +926,96 @@ public partial class MainViewModel : ObservableObject, IDisposable
         return Path.Combine(dir, $"{name}_{hash}.txt");
     }
 
+    // ── 곡별 폴더 마이그레이션 (PC와 동일 규칙: Downloads\{곡명}\ + 녹음은 그 안의 녹음\) ──
+
+    private static string SanitizeFolderName(string name)
+    {
+        var n = name.TrimEnd('.', ' ');
+        foreach (var c in Path.GetInvalidFileNameChars()) n = n.Replace(c, '_');
+        return n;
+    }
+
+    private void MigrateToSongFolders()
+    {
+        try
+        {
+            string root = DownloadsDir;
+            if (!Directory.Exists(root)) return;
+            var moves = new Dictionary<string, string>();
+
+            // 1) 루트에 평면으로 있는 곡 파일 → Downloads\{곡명}\ 로 이동
+            foreach (var f in Directory.GetFiles(root))
+            {
+                if (!IsAudioFile(f)) continue;
+                var baseName = Path.GetFileNameWithoutExtension(f);
+                var folder = Path.Combine(root, SanitizeFolderName(baseName));
+                Directory.CreateDirectory(folder);
+                var dest = Path.Combine(folder, Path.GetFileName(f));
+                if (File.Exists(dest)) continue;
+                File.Move(f, dest);
+                moves[f] = dest;
+                // 기존 경로 기반 가사 파일 → 곡 폴더 가사.txt 로 승격
+                var oldLyrics = LyricsFilePath(f);
+                var sharedLyrics = Path.Combine(folder, "가사.txt");
+                if (File.Exists(oldLyrics) && !File.Exists(sharedLyrics))
+                    File.Copy(oldLyrics, sharedLyrics);
+            }
+
+            // 2) 루트\녹음\ 에 쌓인 REC 파일 → 해당 곡 폴더\녹음\ 로 이동
+            var rootRec = Path.Combine(root, "녹음");
+            if (Directory.Exists(rootRec))
+            {
+                foreach (var f in Directory.GetFiles(rootRec))
+                {
+                    var name = Path.GetFileNameWithoutExtension(f);
+                    var m = System.Text.RegularExpressions.Regex.Match(name, "_REC_(.+)$");
+                    if (!m.Success) continue;
+                    var songFolder = Path.Combine(root, SanitizeFolderName(m.Groups[1].Value));
+                    if (!Directory.Exists(songFolder)) continue;
+                    var recDir = Path.Combine(songFolder, "녹음");
+                    Directory.CreateDirectory(recDir);
+                    var dest = Path.Combine(recDir, Path.GetFileName(f));
+                    if (File.Exists(dest)) continue;
+                    File.Move(f, dest);
+                    moves[f] = dest;
+                }
+                if (Directory.GetFileSystemEntries(rootRec).Length == 0)
+                    Directory.Delete(rootRec);
+            }
+
+            // 3) 저장된 플레이리스트 경로를 새 위치로 갱신
+            if (moves.Count > 0)
+            {
+                for (int i = 0; i < _settings.Playlist.Count; i++)
+                    if (moves.TryGetValue(_settings.Playlist[i], out var np))
+                        _settings.Playlist[i] = np;
+                _settings.Save();
+            }
+        }
+        catch { }
+    }
+
+    // 곡 폴더 공유 가사 경로 (원본/변조본/녹음이 하나의 가사.txt 공유). 대상이 아니면 null
+    private string? GetSharedLyricsPath(string trackPath)
+    {
+        try
+        {
+            if (trackPath.StartsWith("content://") || trackPath.StartsWith("http") || trackPath.StartsWith("file://"))
+                return null;
+            var dir = Path.GetDirectoryName(trackPath);
+            if (dir == null) return null;
+            var parentName = Path.GetFileName(dir);
+            if (parentName == "녹음" || string.Equals(parentName, "Recordings", StringComparison.OrdinalIgnoreCase))
+                dir = Path.GetDirectoryName(dir);
+            if (dir == null) return null;
+            var root = DownloadsDir.TrimEnd(Path.DirectorySeparatorChar);
+            if (!dir.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                return null;
+            return Path.Combine(dir, "가사.txt");
+        }
+        catch { return null; }
+    }
+
     // 사용자가 편집 모드에서 실제로 고친 경우에만 저장 — 빈 텍스트가 기존 가사를 덮어쓰는 사고 방지
     private bool _lyricsDirty;
     private bool _suppressLyricsDirty;
@@ -939,6 +1030,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _suppressLyricsDirty = true;
         try
         {
+            // 곡 폴더 공유 가사 우선 (원본/변조본/녹음이 함께 사용)
+            var shared = GetSharedLyricsPath(filePath);
+            if (shared != null && File.Exists(shared))
+            {
+                LyricsText = File.ReadAllText(shared);
+                return;
+            }
             var lf = LyricsFilePath(filePath);
             if (File.Exists(lf))
             {
@@ -966,7 +1064,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (CurrentIndex < 0 || CurrentIndex >= Playlist.Count) return;
         try
         {
-            File.WriteAllText(LyricsFilePath(Playlist[CurrentIndex].FilePath), LyricsText);
+            var trackPath = Playlist[CurrentIndex].FilePath;
+            var target = GetSharedLyricsPath(trackPath) ?? LyricsFilePath(trackPath);
+            File.WriteAllText(target, LyricsText);
             _lyricsDirty = false;
         }
         catch { }
@@ -1026,7 +1126,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         ScanLibrary();
     }
 
-    private static readonly string[] AudioExtensions = [".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac"];
+    private static readonly string[] AudioExtensions = [".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac", ".opus", ".webm"];
 
     public void ScanLibrary()
     {
@@ -1091,8 +1191,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 var ext = streamInfo.Container.Name;
                 var safeTitle = string.Join("_", video.Title.Split(Path.GetInvalidFileNameChars()));
                 if (safeTitle.Length > 80) safeTitle = safeTitle[..80];
+                safeTitle = safeTitle.TrimEnd('.', ' ');
                 var fileName = $"{safeTitle}.{ext}";
-                var savePath = Path.Combine(FileSystem.AppDataDirectory, "Downloads");
+                // 곡별 폴더: Downloads\{곡명}\{곡명}.{ext} — 파생물(녹음/변조본)이 이 안에 모임
+                var savePath = Path.Combine(FileSystem.AppDataDirectory, "Downloads", safeTitle);
                 Directory.CreateDirectory(savePath);
                 var filePath = Path.Combine(savePath, fileName);
 
@@ -1250,22 +1352,26 @@ public partial class MainViewModel : ObservableObject, IDisposable
         catch { }
     }
 
-    // Downloads 폴더의 모든 파일
+    private static bool IsAudioFile(string path) =>
+        AudioExtensions.Contains(Path.GetExtension(path).ToLowerInvariant());
+
+    // Downloads 폴더의 모든 오디오 파일 (곡별 폴더 포함)
     public string[] GetAllDownloadedFiles()
     {
         if (!Directory.Exists(DownloadsDir)) return [];
-        return Directory.GetFiles(DownloadsDir)
+        return Directory.GetFiles(DownloadsDir, "*", SearchOption.AllDirectories)
+            .Where(IsAudioFile)
             .OrderBy(Path.GetFileNameWithoutExtension)
             .ToArray();
     }
 
-    // Downloads 폴더의 모든 파일 (플레이리스트 미포함 파일만)
+    // Downloads 폴더의 모든 오디오 파일 (플레이리스트 미포함 파일만)
     public string[] GetDownloadedFilesNotInPlaylist()
     {
         if (!Directory.Exists(DownloadsDir)) return [];
         var inPlaylist = new HashSet<string>(Playlist.Select(p => p.FilePath));
-        return Directory.GetFiles(DownloadsDir)
-            .Where(f => !inPlaylist.Contains(f))
+        return Directory.GetFiles(DownloadsDir, "*", SearchOption.AllDirectories)
+            .Where(f => IsAudioFile(f) && !inPlaylist.Contains(f))
             .OrderBy(Path.GetFileNameWithoutExtension)
             .ToArray();
     }
@@ -1287,8 +1393,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         if (!Directory.Exists(DownloadsDir)) return [];
         var inPlaylist = new HashSet<string>(Playlist.Select(p => p.FilePath));
-        return Directory.GetFiles(DownloadsDir)
-            .Where(f => !inPlaylist.Contains(f))
+        return Directory.GetFiles(DownloadsDir, "*", SearchOption.AllDirectories)
+            .Where(f => IsAudioFile(f) && !inPlaylist.Contains(f))
             .ToArray();
     }
 
