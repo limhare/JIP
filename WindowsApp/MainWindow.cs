@@ -471,6 +471,8 @@ public partial class MainWindow : Window
 		TempoLabelText.Text = S("속도", "Tempo");
 		PitchResetBtn.Content = S("원키", "Reset");
 		TempoResetBtn.Content = S("원속도", "Reset");
+		VolumeResetBtn.Content = S("기본", "Reset");
+		VolumeResetBtn.ToolTip = S("볼륨 100%로", "Volume to 100%");
 		AbSetABtn.Content = S("A 지점", "Set A");
 		AbSetBBtn.Content = S("B 지점", "Set B");
 		AbClearBtn.Content = S("해제", "Clear");
@@ -3201,8 +3203,9 @@ public partial class MainWindow : Window
 		double newValue = e.NewValue;
 		if (VolumeText != null)
 		{
-			VolumeText.Text = $"{(int)(newValue * 100.0)}%";
-			VolumeText.Foreground = ((newValue > 1.0) ? new SolidColorBrush(Color.FromRgb(byte.MaxValue, 102, 102)) : new SolidColorBrush(Color.FromRgb(170, 170, 170)));
+			int percent = (int)Math.Round(newValue * 100.0);
+			VolumeText.Text = $"{percent}%";
+			VolumeText.Foreground = ((percent > 100) ? new SolidColorBrush(Color.FromRgb(byte.MaxValue, 102, 102)) : new SolidColorBrush(Color.FromRgb(170, 170, 170)));
 		}
 		if (monitorBoost != null)
 		{
@@ -3238,6 +3241,11 @@ public partial class MainWindow : Window
 	private void PitchResetBtn_Click(object sender, RoutedEventArgs e)
 	{
 		PitchSlider.Value = 0.0;
+	}
+
+	private void VolumeResetBtn_Click(object sender, RoutedEventArgs e)
+	{
+		VolumeSlider.Value = 1.0;
 	}
 
 	private void TempoSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
