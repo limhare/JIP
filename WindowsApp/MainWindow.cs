@@ -1973,6 +1973,7 @@ public partial class MainWindow : Window
 			base.Dispatcher.Invoke(delegate
 			{
 				LibraryRefreshBtn_Click(this, new RoutedEventArgs());
+				AddRecordingToPlaylist(pendingSavePath);
 			});
 		};
 		waveIn.StartRecording();
@@ -2082,6 +2083,7 @@ public partial class MainWindow : Window
 				{
 					RecordBtn.Content = S("● 녹음", "● Rec");
 					LibraryRefreshBtn_Click(this, new RoutedEventArgs());
+					AddRecordingToPlaylist(pendingSavePath);
 				});
 			}
 		});
@@ -2122,6 +2124,16 @@ public partial class MainWindow : Window
 			MixingSampleProvider source = new MixingSampleProvider(new ISampleProvider[2] { sampleProvider, sampleProvider2 });
 			WaveFileWriter.CreateWaveFile(savePath, new SampleToWaveProvider(source));
 		});
+	}
+
+	private void AddRecordingToPlaylist(string recPath)
+	{
+		if (System.IO.File.Exists(recPath) && !playlist.Contains(recPath))
+		{
+			AddToPlaylistInternal(recPath);
+			PlaylistBox.ScrollIntoView(PlaylistBox.Items[PlaylistBox.Items.Count - 1]);
+			PlaylistBox.SelectedIndex = PlaylistBox.Items.Count - 1;
+		}
 	}
 
 	private void OnRecordingFinished()
