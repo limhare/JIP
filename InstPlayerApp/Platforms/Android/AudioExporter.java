@@ -289,6 +289,136 @@ public class AudioExporter {
         Log.i(TAG, "HQ Done: " + outputPath);
     }
 
+    /** Start decode-to-WAV (16-bit PCM) in background thread. Poll isDone(). */
+    public void startDecodeWav(String inputPath, String outputPath) {
+        progress  = 0;
+        done      = false;
+        result    = null;
+        error     = null;
+        cancelled = false;
+
+        final String fInput  = inputPath;
+        final String fOutput = outputPath;
+        new Thread(new Runnable() {
+            @Override public void run() {
+                try {
+                    doDecodeWav(fInput, fOutput);
+                } catch (Exception e) {
+                    Log.e(TAG, "Decode failed", e);
+                    error = e.getMessage() != null ? e.getMessage() : "Unknown error";
+                    done  = true;
+                }
+            }
+        }, "jip-decode").start();
+    }
+
+    private void doDecodeWav(String inputPath, String outputPath) throws Exception {
+        MediaExtractor extractor = new MediaExtractor();
+        try { extractor.setDataSource(inputPath); }
+        catch (IOException e) { throw new Exception("Cannot open: " + e.getMessage()); }
+
+        int audioTrack = -1;
+        MediaFormat format = null;
+        for (int i = 0; i < extractor.getTrackCount(); i++) {
+            MediaFormat f = extractor.getTrackFormat(i);
+            String m = f.getString(MediaFormat.KEY_MIME);
+            if (m != null && m.startsWith("audio/")) { audioTrack = i; format = f; break; }
+        }
+        if (audioTrack < 0 || format == null) { extractor.release(); throw new Exception("No audio track"); }
+        extractor.selectTrack(audioTrack);
+
+        String mime = format.getString(MediaFormat.KEY_MIME);
+        int sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE);
+        int channels   = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT);
+        long durationUs = format.containsKey(MediaFormat.KEY_DURATION) ? format.getLong(MediaFormat.KEY_DURATION) : -1;
+
+        MediaCodec decoder = MediaCodec.createDecoderByType(mime);
+        decoder.configure(format, null, null, 0);
+        decoder.start();
+
+        java.io.RandomAccessFile raf = new java.io.RandomAccessFile(outputPath, "rw");
+        raf.setLength(0);
+        raf.write(new byte[44]); // placeholder header
+        long dataBytes = 0;
+
+        MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
+        boolean inputDone = false, outputDone = false, isFloat = false;
+        byte[] tmp = new byte[65536];
+
+        while (!outputDone && !cancelled) {
+            if (!inputDone) {
+                int idx = decoder.dequeueInputBuffer(TIMEOUT_US);
+                if (idx >= 0) {
+                    ByteBuffer inBuf = decoder.getInputBuffer(idx);
+                    int size = extractor.readSampleData(inBuf, 0);
+                    if (size < 0) {
+                        decoder.queueInputBuffer(idx, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+                        inputDone = true;
+                    } else {
+                        decoder.queueInputBuffer(idx, 0, size, extractor.getSampleTime(), 0);
+                        extractor.advance();
+                    }
+                }
+            }
+            int idx = decoder.dequeueOutputBuffer(info, TIMEOUT_US);
+            if (idx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+                MediaFormat f = decoder.getOutputFormat();
+                int enc = f.containsKey(MediaFormat.KEY_PCM_ENCODING)
+                        ? f.getInteger(MediaFormat.KEY_PCM_ENCODING)
+                        : android.media.AudioFormat.ENCODING_PCM_16BIT;
+                isFloat = (enc == android.media.AudioFormat.ENCODING_PCM_FLOAT);
+            } else if (idx >= 0) {
+                ByteBuffer out = decoder.getOutputBuffer(idx);
+                if (out != null && info.size > 0) {
+                    out.position(info.offset);
+                    out.limit(info.offset + info.size);
+                    out.order(ByteOrder.LITTLE_ENDIAN);
+                    if (isFloat) {
+                        int samples = info.size / 4;
+                        int need = samples * 2;
+                        if (tmp.length < need) tmp = new byte[need];
+                        for (int i = 0; i < samples; i++) {
+                            float v = out.getFloat();
+                            int s = Math.max(-32768, Math.min(32767, Math.round(v * 32767f)));
+                            tmp[i * 2]     = (byte)(s & 0xFF);
+                            tmp[i * 2 + 1] = (byte)((s >> 8) & 0xFF);
+                        }
+                        raf.write(tmp, 0, need);
+                        dataBytes += need;
+                    } else {
+                        int n = info.size;
+                        if (tmp.length < n) tmp = new byte[n];
+                        out.get(tmp, 0, n);
+                        raf.write(tmp, 0, n);
+                        dataBytes += n;
+                    }
+                }
+                decoder.releaseOutputBuffer(idx, false);
+                if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) outputDone = true;
+                if (durationUs > 0 && info.presentationTimeUs > 0)
+                    progress = (int) Math.min(99, info.presentationTimeUs * 100L / durationUs);
+            }
+        }
+        decoder.stop(); decoder.release(); extractor.release();
+
+        if (cancelled) { raf.close(); new java.io.File(outputPath).delete(); error = "Cancelled"; done = true; return; }
+
+        raf.seek(0);
+        int byteRate = sampleRate * channels * 2;
+        java.nio.ByteBuffer hb = java.nio.ByteBuffer.allocate(44).order(ByteOrder.LITTLE_ENDIAN);
+        hb.put("RIFF".getBytes()); hb.putInt((int)(36 + dataBytes)); hb.put("WAVE".getBytes());
+        hb.put("fmt ".getBytes()); hb.putInt(16); hb.putShort((short)1); hb.putShort((short)channels);
+        hb.putInt(sampleRate); hb.putInt(byteRate); hb.putShort((short)(channels * 2)); hb.putShort((short)16);
+        hb.put("data".getBytes()); hb.putInt((int)dataBytes);
+        raf.write(hb.array());
+        raf.close();
+
+        progress = 100;
+        result = outputPath;
+        done = true;
+        Log.i(TAG, "Decode done: " + outputPath);
+    }
+
     private void doExport(String inputPath, float pitchSemitones, float tempoPercent,
                           String outputPath) throws Exception {
 

@@ -14,6 +14,7 @@ internal class AudioExportBridge : IDisposable
     private nint _exporterClass;
     private nint _startExportId;
     private nint _startExportHQId;
+    private nint _startDecodeWavId;
     private nint _cancelId;
     private nint _isDoneId;
     private nint _getProgressId;
@@ -34,6 +35,8 @@ internal class AudioExportBridge : IDisposable
             "(Ljava/lang/String;FFLjava/lang/String;)V");
         _startExportHQId = JNIEnv.GetMethodID(_exporterClass, "startExportHQ",
             "(Ljava/lang/String;FFLjava/lang/String;)V");
+        _startDecodeWavId = JNIEnv.GetMethodID(_exporterClass, "startDecodeWav",
+            "(Ljava/lang/String;Ljava/lang/String;)V");
         _cancelId      = JNIEnv.GetMethodID(_exporterClass, "cancel",      "()V");
         _isDoneId      = JNIEnv.GetMethodID(_exporterClass, "isDone",      "()Z");
         _getProgressId = JNIEnv.GetMethodID(_exporterClass, "getProgress", "()I");
@@ -128,6 +131,43 @@ internal class AudioExportBridge : IDisposable
             : outputPath;
 
         return result;
+    }
+
+    public async Task<string> DecodeToWavAsync(
+        string inputPath, string outputWavPath,
+        IProgress<int>? progress = null,
+        CancellationToken ct = default)
+    {
+        EnsureInit();
+
+        using var jInput  = new Java.Lang.String(inputPath);
+        using var jOutput = new Java.Lang.String(outputWavPath);
+
+        JNIEnv.CallVoidMethod(_exporterRef, _startDecodeWavId,
+            new JValue(jInput),
+            new JValue(jOutput));
+
+        while (true)
+        {
+            await Task.Delay(200, ct);
+            bool done = JNIEnv.CallBooleanMethod(_exporterRef, _isDoneId);
+            int  pct  = JNIEnv.CallIntMethod(_exporterRef, _getProgressId);
+            progress?.Report(pct);
+            if (done) break;
+        }
+
+        nint errorHandle  = JNIEnv.CallObjectMethod(_exporterRef, _getErrorId);
+        nint resultHandle = JNIEnv.CallObjectMethod(_exporterRef, _getResultId);
+
+        string? error = errorHandle != nint.Zero
+            ? JNIEnv.GetString(errorHandle, JniHandleOwnership.TransferLocalRef)
+            : null;
+
+        if (error != null) throw new Exception(error);
+
+        return resultHandle != nint.Zero
+            ? JNIEnv.GetString(resultHandle, JniHandleOwnership.TransferLocalRef)!
+            : outputWavPath;
     }
 
     public void Cancel()

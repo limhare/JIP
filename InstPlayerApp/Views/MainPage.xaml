@@ -511,6 +511,19 @@
                             <ProgressBar Progress="{Binding ExportProgress, Converter={StaticResource DivideBy100}}"
                                          ProgressColor="#4A9EFF" HeightRequest="6" />
                         </VerticalStackLayout>
+                        <!-- Recording: 마이크 / 반주+마이크 -->
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="4">
+                            <Button Grid.Column="0" Text="{Binding RecordModeText}"
+                                    Command="{Binding ToggleRecordModeCommand}"
+                                    BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                                    FontSize="12" HeightRequest="38" CornerRadius="8" Padding="10,0" />
+                            <Button Grid.Column="1" Text="{Binding RecordButtonText}"
+                                    Command="{Binding ToggleRecordCommand}"
+                                    BackgroundColor="#2D2D30" TextColor="#FF5555"
+                                    FontSize="13" HeightRequest="38" CornerRadius="8" />
+                            <Label Grid.Column="2" Text="{Binding RecordStatusText}" TextColor="#4A9EFF"
+                                   FontSize="11" VerticalOptions="Center" />
+                        </Grid>
                         <!-- Main Playback Controls -->
                         <Grid ColumnDefinitions="*,*,1.6*,*,*" ColumnSpacing="4" HeightRequest="72">
                             <Button Grid.Column="0" Text="{Binding RepeatIcon}" FontSize="15" Padding="0"
@@ -685,6 +698,20 @@
                 <ProgressBar Progress="{Binding ExportProgress, Converter={StaticResource DivideBy100}}"
                              ProgressColor="#4A9EFF" HeightRequest="6" />
             </VerticalStackLayout>
+
+            <!-- Recording: 마이크 / 반주+마이크 -->
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="4">
+                <Button Grid.Column="0" Text="{Binding RecordModeText}"
+                        Command="{Binding ToggleRecordModeCommand}"
+                        BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                        FontSize="13" HeightRequest="40" CornerRadius="8" Padding="10,0" />
+                <Button Grid.Column="1" Text="{Binding RecordButtonText}"
+                        Command="{Binding ToggleRecordCommand}"
+                        BackgroundColor="#2D2D30" TextColor="#FF5555"
+                        FontSize="14" HeightRequest="40" CornerRadius="8" />
+                <Label Grid.Column="2" Text="{Binding RecordStatusText}" TextColor="#4A9EFF"
+                       FontSize="12" VerticalOptions="Center" />
+            </Grid>
 
             <!-- Main Playback Controls (Row 1) -->
             <Grid ColumnDefinitions="*,*,1.6*,*,*" ColumnSpacing="6" HeightRequest="84">

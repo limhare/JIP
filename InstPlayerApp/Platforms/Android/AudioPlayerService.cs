@@ -163,6 +163,14 @@ public class AudioPlayerService : IAudioPlayerService
                                               outputPath, progress, ct);
     }
 
+    public async Task<string> DecodeToWavAsync(string inputPath, string outputWavPath,
+                                                IProgress<int>? progress = null,
+                                                CancellationToken ct = default)
+    {
+        _exporter ??= new AudioExportBridge();
+        return await _exporter.DecodeToWavAsync(inputPath, outputWavPath, progress, ct);
+    }
+
     internal void OnStateEnded()
     {
         Status = PlaybackStatus.Stopped;

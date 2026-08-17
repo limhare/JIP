@@ -72,8 +72,10 @@
 		<AndroidNativeLibrary Include="Platforms\Android\libs\armeabi-v7a\librb_export.so">
 			<Abi>armeabi-v7a</Abi>
 		</AndroidNativeLibrary>
-		<!-- Demucs: AI accompaniment extraction (arm64-v8a only) -->
-		<AndroidNativeLibrary Include="..\demucs_build\libs\arm64-v8a\libdemucs_jni.so">
+		<!-- Demucs: AI accompaniment extraction (arm64-v8a only).
+		     .so는 NDK 빌드 산출물이라 저장소에 없음 — 없으면 Demucs 기능 제외하고 패키징됨 -->
+		<AndroidNativeLibrary Include="..\demucs_build\libs\arm64-v8a\libdemucs_jni.so"
+		                      Condition="Exists('..\demucs_build\libs\arm64-v8a\libdemucs_jni.so')">
 			<Abi>arm64-v8a</Abi>
 		</AndroidNativeLibrary>
 	</ItemGroup>

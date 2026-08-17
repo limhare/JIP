@@ -282,9 +282,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
         var item = Playlist[index];
         _currentPlayingItem = item; // 참조 저장 (리오더 시 인덱스 추적용)
         _audio.LoadAndPlay(item.FilePath);
-        _audio.SetPitchTempo(Pitch, Tempo);
+        // 녹음 파일은 파일 자체에 키/템포가 반영되어 있으므로 항상 원키·원속도로 재생
+        bool isRecFile = item.FileName.Contains("_REC_") ||
+                         Path.GetFileName(Path.GetDirectoryName(item.FilePath) ?? "") == "녹음";
+        _audio.SetPitchTempo(isRecFile ? 0 : Pitch, isRecFile ? 0f : Tempo);
 
-        NowPlayingText = item.DisplayName;
+        NowPlayingText = item.DisplayName + (isRecFile && (Pitch != 0 || (int)Tempo != 0) ? " [원키]" : "");
         PlayPauseIcon = "\u25AE\u25AE";
         LoadLyrics(item.FilePath);
 
@@ -521,6 +524,194 @@ public partial class MainViewModel : ObservableObject, IDisposable
         catch { }
 #endif
     }
+
+    // ── Recording (마이크 / 반주+마이크) ──
+
+    [ObservableProperty] private bool isRecording;
+    [ObservableProperty] private bool recordMixMode = true;
+    [ObservableProperty] private string recordStatusText = "";
+    [ObservableProperty] private string recordButtonText = "● 녹음";
+    [ObservableProperty] private string recordModeText = "반주+마이크";
+    [ObservableProperty] private bool isRecordSaving;
+
+#if ANDROID
+    private Platforms.Android.MicRecorder? _micRecorder;
+    private string _recMicPath = "";
+    private string _recMrPath = "";
+    private double _recMrOffsetMs;
+    private int _recPitch;
+    private float _recTempo;
+#endif
+
+    [RelayCommand]
+    private void ToggleRecordMode()
+    {
+        if (IsRecording) return;
+        RecordMixMode = !RecordMixMode;
+        RecordModeText = RecordMixMode ? "반주+마이크" : "마이크";
+    }
+
+    [RelayCommand]
+    private async Task ToggleRecordAsync()
+    {
+#if ANDROID
+        if (IsRecordSaving) return;
+        if (!IsRecording) await StartRecordingAsync();
+        else await StopRecordingAsync();
+#else
+        await Task.CompletedTask;
+#endif
+    }
+
+#if ANDROID
+    private async Task StartRecordingAsync()
+    {
+        var status = await Permissions.RequestAsync<Permissions.Microphone>();
+        if (status != PermissionStatus.Granted)
+        {
+            await Shell.Current.DisplayAlert("녹음", "마이크 권한이 필요합니다.", "확인");
+            return;
+        }
+
+        _recMrPath = "";
+        _recMrOffsetMs = 0;
+        _recPitch = Pitch;
+        _recTempo = Tempo;
+
+        if (RecordMixMode)
+        {
+            if (CurrentIndex < 0 || CurrentIndex >= Playlist.Count)
+            {
+                await Shell.Current.DisplayAlert("녹음", "반주+마이크 녹음은 곡을 먼저 선택해야 합니다.", "확인");
+                return;
+            }
+            string p = Playlist[CurrentIndex].FilePath;
+            if (p.StartsWith("content://") || p.StartsWith("http"))
+            {
+                await Shell.Current.DisplayAlert("녹음",
+                    "이 파일은 반주+마이크 녹음을 지원하지 않습니다.\n(앱에서 다운로드한 곡에서 사용해주세요)", "확인");
+                return;
+            }
+            _recMrPath = p;
+            if (_audio.Status != PlaybackStatus.Playing)
+            {
+                if (_audio.Status == PlaybackStatus.Paused)
+                {
+                    _audio.Play();
+                    PlayPauseIcon = "▮▮";
+                }
+                else
+                {
+                    PlayTrack(CurrentIndex);
+                }
+            }
+        }
+
+        try
+        {
+            _recMicPath = Path.Combine(FileSystem.CacheDirectory, $"rec_mic_{DateTime.Now:yyMMdd_HHmmss}.wav");
+            _micRecorder = new Platforms.Android.MicRecorder();
+            _micRecorder.Start(_recMicPath);
+        }
+        catch (Exception ex)
+        {
+            _micRecorder = null;
+            await Shell.Current.DisplayAlert("녹음 시작 실패", ex.Message, "확인");
+            return;
+        }
+        if (RecordMixMode)
+        {
+            _recMrOffsetMs = _audio.Position.TotalMilliseconds; // 마이크 시작 직후 반주 위치 (싱크 기준)
+        }
+        IsRecording = true;
+        RecordButtonText = "■ 중지";
+        RecordStatusText = "녹음 중...";
+    }
+
+    private async Task StopRecordingAsync()
+    {
+        if (_micRecorder == null) return;
+        string micWav;
+        try
+        {
+            micWav = _micRecorder.Stop();
+        }
+        finally
+        {
+            _micRecorder.Dispose();
+            _micRecorder = null;
+        }
+        if (_audio.Status == PlaybackStatus.Playing)
+        {
+            _audio.Pause();
+            PlayPauseIcon = "▶";
+        }
+        IsRecording = false;
+        RecordButtonText = "● 녹음";
+        IsRecordSaving = true;
+        try
+        {
+            string basisPath = _recMrPath;
+            if (string.IsNullOrEmpty(basisPath) && CurrentIndex >= 0 && CurrentIndex < Playlist.Count)
+            {
+                string cp = Playlist[CurrentIndex].FilePath;
+                if (!cp.StartsWith("content://") && !cp.StartsWith("http")) basisPath = cp;
+            }
+            string songBase = !string.IsNullOrEmpty(basisPath)
+                ? Path.GetFileNameWithoutExtension(basisPath)
+                : ((CurrentIndex >= 0 && CurrentIndex < Playlist.Count) ? Playlist[CurrentIndex].DisplayName : "untitled");
+            foreach (char c in Path.GetInvalidFileNameChars()) songBase = songBase.Replace(c, '_');
+
+            string outDir = !string.IsNullOrEmpty(basisPath)
+                ? Path.Combine(Path.GetDirectoryName(basisPath)!, "녹음")
+                : Path.Combine(FileSystem.AppDataDirectory, "Recordings");
+            Directory.CreateDirectory(outDir);
+            string ts = DateTime.Now.ToString("yyMMdd_HHmmss");
+            string outputPath = Path.Combine(outDir, $"{ts}_REC_{songBase}.mp3");
+
+            var prog = new Progress<int>(p => RecordStatusText = $"저장 중... {p}%");
+            if (!string.IsNullOrEmpty(_recMrPath))
+            {
+                string tmpMr    = Path.Combine(FileSystem.CacheDirectory, "rec_mr.mp3");
+                string tmpMrWav = Path.Combine(FileSystem.CacheDirectory, "rec_mr.wav");
+                string tmpMix   = Path.Combine(FileSystem.CacheDirectory, "rec_mix.wav");
+                RecordStatusText = "반주 렌더링...";
+                await _audio.ExportMp3Async(_recMrPath, _recPitch, _recTempo, tmpMr, prog);
+                RecordStatusText = "반주 디코딩...";
+                await _audio.DecodeToWavAsync(tmpMr, tmpMrWav, prog);
+                RecordStatusText = "믹싱...";
+                await Task.Run(() => Platforms.Android.WavMixer.Mix(tmpMrWav, micWav, tmpMix, _recMrOffsetMs));
+                RecordStatusText = "인코딩...";
+                await _audio.ExportMp3Async(tmpMix, 0, 0, outputPath, prog);
+                foreach (string t in new[] { tmpMr, tmpMrWav, tmpMix })
+                {
+                    try { File.Delete(t); } catch { }
+                }
+            }
+            else
+            {
+                RecordStatusText = "인코딩...";
+                await _audio.ExportMp3Async(micWav, 0, 0, outputPath, prog);
+            }
+            try { File.Delete(micWav); } catch { }
+
+            if (Playlist.All(pp => pp.FilePath != outputPath))
+                Playlist.Add(new PlaylistItem { FilePath = outputPath });
+            RecordStatusText = "";
+            await Shell.Current.DisplayAlert("녹음 완료",
+                Path.GetFileName(outputPath) + "\n재생목록에 추가되었습니다.", "확인");
+        }
+        catch (Exception ex)
+        {
+            RecordStatusText = "";
+            await Shell.Current.DisplayAlert("녹음 저장 실패", ex.Message, "확인");
+        }
+        finally
+        {
+            IsRecordSaving = false;
+        }
+    }
+#endif
 
     // ── Volume ──
 

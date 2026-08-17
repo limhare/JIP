@@ -22,6 +22,9 @@ public interface IAudioPlayerService
     Task<string> ExportMp3HQAsync(string inputPath, int pitchSemitones, float tempoPercent,
                                   string outputPath, IProgress<int>? progress = null,
                                   CancellationToken ct = default);
+    Task<string> DecodeToWavAsync(string inputPath, string outputWavPath,
+                                  IProgress<int>? progress = null,
+                                  CancellationToken ct = default);
     void Dispose();
 
     event Action? PlaybackEnded;
