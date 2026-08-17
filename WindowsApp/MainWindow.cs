@@ -3293,6 +3293,19 @@ public partial class MainWindow : Window
 			LyricsBox.Text = "";
 			return;
 		}
+		string sharedPath = GetSharedLyricsPath(currentLyricsPath);
+		if (sharedPath != null && System.IO.File.Exists(sharedPath))
+		{
+			try
+			{
+				string sharedLyrics = System.IO.File.ReadAllText(sharedPath);
+				LyricsBox.Text = (string.IsNullOrEmpty(sharedLyrics) ? "가사 없음\n\n편집 버튼을 눌러 가사를 추가하세요." : sharedLyrics);
+				return;
+			}
+			catch
+			{
+			}
+		}
 		try
 		{
 			using TagLib.File file = TagLib.File.Create(new SharedReadFileAbstraction(currentLyricsPath));
@@ -3301,7 +3314,7 @@ public partial class MainWindow : Window
 		}
 		catch
 		{
-			LyricsBox.Text = "가사를 불러올 수 없습니다.";
+			LyricsBox.Text = (System.IO.Path.GetExtension(currentLyricsPath).Equals(".wav", StringComparison.OrdinalIgnoreCase) ? "가사 없음\n\n편집 버튼을 눌러 가사를 추가하세요." : "가사를 불러올 수 없습니다.");
 		}
 	}
 
@@ -3325,10 +3338,62 @@ public partial class MainWindow : Window
 		}
 	}
 
+	private string? GetSharedLyricsPath(string audioPath)
+	{
+		try
+		{
+			string dir = System.IO.Path.GetDirectoryName(audioPath);
+			if (dir == null)
+			{
+				return null;
+			}
+			string parentName = System.IO.Path.GetFileName(dir);
+			if (parentName == "녹음" || string.Equals(parentName, "Recordings", StringComparison.OrdinalIgnoreCase))
+			{
+				dir = System.IO.Path.GetDirectoryName(dir);
+				if (dir == null)
+				{
+					return null;
+				}
+			}
+			if (string.IsNullOrEmpty(musicRootPath))
+			{
+				return null;
+			}
+			string rootTrim = musicRootPath.TrimEnd('\\', '/');
+			if (!dir.StartsWith(rootTrim + System.IO.Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+			{
+				return null;
+			}
+			return System.IO.Path.Combine(dir, "가사.txt");
+		}
+		catch
+		{
+			return null;
+		}
+	}
+
 	private void SaveLyricsBtn_Click(object sender, RoutedEventArgs e)
 	{
 		if (string.IsNullOrEmpty(currentLyricsPath))
 		{
+			return;
+		}
+		string sharedPath = GetSharedLyricsPath(currentLyricsPath);
+		if (sharedPath != null)
+		{
+			try
+			{
+				System.IO.File.WriteAllText(sharedPath, LyricsBox.Text, new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
+				lyricsEditMode = false;
+				LyricsBox.IsReadOnly = true;
+				EditLyricsBtn.Content = S("편집", "Edit");
+				SaveLyricsBtn.IsEnabled = false;
+			}
+			catch (Exception ex2)
+			{
+				MessageBox.Show(S("가사 저장 실패: ", "Failed to save lyrics: ") + ex2.Message);
+			}
 			return;
 		}
 		try
