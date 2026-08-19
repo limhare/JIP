@@ -15,6 +15,8 @@
 		<ApplicationVersion>1</ApplicationVersion>
 
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
+		<!-- yt-dlp(python)/ffmpeg 네이티브가 커서 arm64만 패키징 (S26+/최신 태블릿용) -->
+		<RuntimeIdentifiers Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">android-arm64</RuntimeIdentifiers>
 
 		<AndroidSdkDirectory>C:\Users\USER\AppData\Local\Android\Sdk</AndroidSdkDirectory>
 		<JavaSdkDirectory>d:\android\jbr</JavaSdkDirectory>
@@ -42,6 +44,18 @@
 	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
 		<AndroidJavaSource Include="Platforms\Android\AudioExporter.java" />
 		<AndroidJavaSource Include="Platforms\Android\DemucsProcessor.java" />
+	</ItemGroup>
+
+	<!-- yt-dlp (youtubedl-android) + 의존성 — 바인딩 없이 패키징, JNI로 사용 -->
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+		<AndroidLibrary Include="Platforms\Android\libs-ytdlp\library-0.18.1.aar" Bind="false" />
+		<AndroidLibrary Include="Platforms\Android\libs-ytdlp\common-0.18.1.aar" Bind="false" />
+		<AndroidLibrary Include="Platforms\Android\libs-ytdlp\ffmpeg-0.18.1.aar" Bind="false" />
+		<AndroidLibrary Include="Platforms\Android\libs-ytdlp\jackson-databind-2.11.1.jar" Bind="false" />
+		<AndroidLibrary Include="Platforms\Android\libs-ytdlp\jackson-annotations-2.11.1.jar" Bind="false" />
+		<AndroidLibrary Include="Platforms\Android\libs-ytdlp\jackson-core-2.11.1.jar" Bind="false" />
+		<AndroidLibrary Include="Platforms\Android\libs-ytdlp\commons-io-2.5.jar" Bind="false" />
+		<!-- kotlin-stdlib/annotations jar 제외: MAUI(AndroidX) 번들에 이미 포함되어 dex 중복 발생 -->
 	</ItemGroup>
 
 	<!-- SoundTouch native libraries -->

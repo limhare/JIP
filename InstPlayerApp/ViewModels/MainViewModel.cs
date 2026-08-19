@@ -4,8 +4,6 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using InstPlayerApp.Models;
 using InstPlayerApp.Services;
-using YoutubeExplode;
-using YoutubeExplode.Videos.Streams;
 
 namespace InstPlayerApp.ViewModels;
 
@@ -132,6 +130,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _settings = AppSettings.Load();
         MigrateToSongFolders();
         ApplySettings();
+#if ANDROID
+        Platforms.Android.YtDlpDownloader.InitInBackground(); // 최초 실행 python 추출 선행
+#endif
 
         Playlist.CollectionChanged += (_, e) =>
         {
@@ -1225,48 +1226,50 @@ public partial class MainViewModel : ObservableObject, IDisposable
             if (url.Contains("&start_radio="))
                 url = url[..url.IndexOf("&start_radio=")];
 
-            // Force all network work off the UI thread (Android NetworkOnMainThreadException)
-            (string filePath, string fileName) result = await Task.Run(async () =>
+#if ANDROID
+            // yt-dlp (PC와 동일 파이프라인) — 곡별 폴더 Downloads/{title}/{title}.{ext}
+            string root = DownloadsDir;
+            Directory.CreateDirectory(root);
+            var before = new HashSet<string>(
+                Directory.GetFiles(root, "*", SearchOption.AllDirectories).Where(IsAudioFile));
+            string template = Path.Combine(root, "%(title)s", "%(title)s.%(ext)s");
+
+            using var dl = new Platforms.Android.YtDlpDownloader();
+            var prog = new Progress<int>(p =>
             {
-                using var httpClient = new HttpClient();
-                var youtube = new YoutubeClient(httpClient);
-
-                var video = await youtube.Videos.GetAsync(url).ConfigureAwait(false);
-                MainThread.BeginInvokeOnMainThread(() =>
-                    YoutubeStatusText = $"\"{video.Title}\" 스트림 검색 중...");
-
-                var manifest = await youtube.Videos.Streams.GetManifestAsync(video.Id).ConfigureAwait(false);
-                var streamInfo = manifest.GetAudioOnlyStreams().GetWithHighestBitrate()
-                    ?? throw new Exception("오디오 스트림 없음");
-
-                var ext = streamInfo.Container.Name;
-                var safeTitle = string.Join("_", video.Title.Split(Path.GetInvalidFileNameChars()));
-                if (safeTitle.Length > 80) safeTitle = safeTitle[..80];
-                safeTitle = safeTitle.TrimEnd('.', ' ');
-                var fileName = $"{safeTitle}.{ext}";
-                // 곡별 폴더: Downloads\{곡명}\{곡명}.{ext} — 파생물(녹음/변조본)이 이 안에 모임
-                var savePath = Path.Combine(FileSystem.AppDataDirectory, "Downloads", safeTitle);
-                Directory.CreateDirectory(savePath);
-                var filePath = Path.Combine(savePath, fileName);
-
-                MainThread.BeginInvokeOnMainThread(() =>
-                    YoutubeStatusText = $"다운로드 중: {video.Title}");
-
-                var progress = new Progress<double>(p => MainThread.BeginInvokeOnMainThread(() =>
-                {
-                    YoutubeProgress = p * 100;
-                    YoutubeStatusText = $"다운로드 중... {p:P0}";
-                }));
-
-                await youtube.Videos.Streams.DownloadAsync(streamInfo, filePath, progress).ConfigureAwait(false);
-                return (filePath, fileName);
+                YoutubeProgress = p;
+                YoutubeStatusText = $"다운로드 중... {p}%";
             });
+            try
+            {
+                await dl.DownloadAsync(url, template, "m4a", prog);
+            }
+            catch (Exception)
+            {
+                // 자동 복구: yt-dlp 업데이트 후 1회 재시도 (PC와 동일)
+                YoutubeStatusText = "yt-dlp 업데이트 중...";
+                await dl.UpdateAsync();
+                YoutubeStatusText = "다시 시도 중...";
+                await dl.DownloadAsync(url, template, "m4a", prog);
+            }
+
+            var newFiles = Directory.GetFiles(root, "*", SearchOption.AllDirectories)
+                .Where(f => IsAudioFile(f) && !before.Contains(f))
+                .ToList();
+            if (newFiles.Count == 0) throw new Exception("다운로드된 파일을 찾을 수 없습니다.");
 
             YoutubeProgress = 100;
-            YoutubeStatusText = $"완료: {result.fileName}";
-            if (Playlist.All(p => p.FilePath != result.filePath))
-                Playlist.Add(new PlaylistItem { FilePath = result.filePath });
+            YoutubeStatusText = $"완료: {Path.GetFileName(newFiles[0])}";
+            foreach (var nf in newFiles)
+            {
+                if (Playlist.All(p => p.FilePath != nf))
+                    Playlist.Add(new PlaylistItem { FilePath = nf });
+            }
             YoutubeUrl = "";
+#else
+            await Task.CompletedTask;
+            throw new Exception("Android 전용");
+#endif
         }
         catch (Exception ex)
         {

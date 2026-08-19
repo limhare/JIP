@@ -48,3 +48,7 @@ WindowsApp/publish/
 
 # Claude settings
 .claude/
+
+InstPlayerApp/Platforms/Android/libs-ytdlp/*.aar
+InstPlayerApp/Platforms/Android/libs-ytdlp/*.jar
+# yt-dlp android AARs/jars - too large for GitHub; fetch with libs-ytdlp/download-libs.ps1
