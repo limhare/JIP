@@ -40,10 +40,15 @@
 		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
 	</ItemGroup>
 
-	<!-- Android Java sources -->
+	<!-- Android Java sources (자동 글롭 안 됨 — 반드시 명시 등록!) -->
 	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
 		<AndroidJavaSource Include="Platforms\Android\AudioExporter.java" />
 		<AndroidJavaSource Include="Platforms\Android\DemucsProcessor.java" />
+		<AndroidJavaSource Include="Platforms\Android\SoundTouchProcessor.java" />
+		<AndroidJavaSource Include="Platforms\Android\SoundTouchExoPlayerBuilder.java" />
+		<AndroidJavaSource Include="Platforms\Android\SoundTouchRenderersFactory.java" />
+		<AndroidJavaSource Include="Platforms\Android\PcmTapProcessor.java" />
+		<AndroidJavaSource Include="Platforms\Android\YtDlpBridge.java" />
 	</ItemGroup>
 
 	<!-- yt-dlp (youtubedl-android) + 의존성 — 바인딩 없이 패키징, JNI로 사용 -->
