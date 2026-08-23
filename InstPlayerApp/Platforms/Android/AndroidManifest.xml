@@ -8,6 +8,17 @@
 		<service android:name="com.instplayer.app.PlaybackForegroundService"
 		         android:foregroundServiceType="mediaPlayback"
 		         android:exported="false" />
+		<!-- Android Auto 미디어 브라우저 -->
+		<service android:name="com.instplayer.app.JipMediaLibraryService"
+		         android:foregroundServiceType="mediaPlayback"
+		         android:exported="true">
+			<intent-filter>
+				<action android:name="androidx.media3.session.MediaLibraryService" />
+				<action android:name="android.media.browse.MediaBrowserService" />
+			</intent-filter>
+		</service>
+		<meta-data android:name="com.google.android.gms.car.application"
+		           android:resource="@xml/automotive_app_desc" />
 		<provider
 			android:name="androidx.core.content.FileProvider"
 			android:authorities="${applicationId}.fileprovider"

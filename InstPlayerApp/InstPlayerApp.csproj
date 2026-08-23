@@ -49,6 +49,7 @@
 		<AndroidJavaSource Include="Platforms\Android\SoundTouchRenderersFactory.java" />
 		<AndroidJavaSource Include="Platforms\Android\PcmTapProcessor.java" />
 		<AndroidJavaSource Include="Platforms\Android\YtDlpBridge.java" />
+		<AndroidJavaSource Include="Platforms\Android\JipMediaLibraryService.java" Bind="false" />
 	</ItemGroup>
 
 	<!-- yt-dlp (youtubedl-android) + 의존성 — 바인딩 없이 패키징, JNI로 사용 -->
