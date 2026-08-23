@@ -681,6 +681,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
         IsRecording = true;
         RecordButtonText = "■ 중지";
         RecordStatusText = "녹음 중...";
+        // 녹음 중 화면 꺼짐/백그라운드 동결 방지
+        Android.App.Application.Context.StartForegroundService(
+            new Android.Content.Intent(Android.App.Application.Context,
+                typeof(ExtractionForegroundService)));
     }
 
     private async Task StopRecordingAsync()
@@ -783,6 +787,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         finally
         {
             IsRecordSaving = false;
+            Android.App.Application.Context.StopService(
+                new Android.Content.Intent(Android.App.Application.Context,
+                    typeof(ExtractionForegroundService)));
         }
     }
 #endif
@@ -1227,6 +1234,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 url = url[..url.IndexOf("&start_radio=")];
 
 #if ANDROID
+            // 화면이 꺼져도 다운로드가 얼지 않도록 포그라운드 서비스로 보호
+            Android.App.Application.Context.StartForegroundService(
+                new Android.Content.Intent(Android.App.Application.Context,
+                    typeof(ExtractionForegroundService)));
             // yt-dlp (PC와 동일 파이프라인) — 곡별 폴더 Downloads/{title}/{title}.{ext}
             string root = DownloadsDir;
             Directory.CreateDirectory(root);
@@ -1279,6 +1290,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             IsDownloading = false;
             DownloadYoutubeCommand.NotifyCanExecuteChanged();
+#if ANDROID
+            Android.App.Application.Context.StopService(
+                new Android.Content.Intent(Android.App.Application.Context,
+                    typeof(ExtractionForegroundService)));
+#endif
         }
     }
 

@@ -81,7 +81,9 @@ public class PcmTapProcessor implements AudioProcessor {
 
     @Override
     public AudioFormat configure(AudioFormat inputAudioFormat) throws UnhandledAudioFormatException {
-        if (inputAudioFormat.encoding != C.ENCODING_PCM_FLOAT) {
+        // SoundTouch 뒤에서는 float, 그 외 경로에선 16-bit도 통과 지원
+        if (inputAudioFormat.encoding != C.ENCODING_PCM_FLOAT
+                && inputAudioFormat.encoding != C.ENCODING_PCM_16BIT) {
             throw new UnhandledAudioFormatException(inputAudioFormat);
         }
         format = inputAudioFormat;
@@ -100,23 +102,31 @@ public class PcmTapProcessor implements AudioProcessor {
         int bytes = buffer.remaining();
         if (bytes == 0) return;
 
-        // 탭 기록 (float32 → 16-bit PCM)
+        // 탭 기록 (float32 → 16-bit 변환, 16-bit는 그대로 복사)
         synchronized (LOCK) {
             if (tapFile != null) {
-                ByteBuffer dup = buffer.duplicate().order(buffer.order());
-                int floats = bytes / 4;
-                byte[] outB = new byte[floats * 2];
-                java.nio.FloatBuffer fb = dup.asFloatBuffer();
-                for (int i = 0; i < floats; i++) {
-                    float v = fb.get();
-                    if (v > 1f) v = 1f; else if (v < -1f) v = -1f;
-                    int s = Math.round(v * 32767f);
-                    outB[i * 2] = (byte) (s & 0xFF);
-                    outB[i * 2 + 1] = (byte) ((s >> 8) & 0xFF);
-                }
                 try {
-                    tapFile.write(outB);
-                    tapBytes += outB.length;
+                    if (format.encoding == C.ENCODING_PCM_FLOAT) {
+                        ByteBuffer dup = buffer.duplicate().order(buffer.order());
+                        int floats = bytes / 4;
+                        byte[] outB = new byte[floats * 2];
+                        java.nio.FloatBuffer fb = dup.asFloatBuffer();
+                        for (int i = 0; i < floats; i++) {
+                            float v = fb.get();
+                            if (v > 1f) v = 1f; else if (v < -1f) v = -1f;
+                            int s = Math.round(v * 32767f);
+                            outB[i * 2] = (byte) (s & 0xFF);
+                            outB[i * 2 + 1] = (byte) ((s >> 8) & 0xFF);
+                        }
+                        tapFile.write(outB);
+                        tapBytes += outB.length;
+                    } else {
+                        ByteBuffer dup = buffer.duplicate().order(buffer.order());
+                        byte[] outB = new byte[bytes];
+                        dup.get(outB);
+                        tapFile.write(outB);
+                        tapBytes += outB.length;
+                    }
                 } catch (Exception ignored) {
                 }
             }

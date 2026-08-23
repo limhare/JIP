@@ -57,13 +57,16 @@ public class SoundTouchProcessor implements AudioProcessor {
     @Override
     public AudioFormat configure(AudioFormat inputAudioFormat) throws UnhandledAudioFormatException {
         int encoding = inputAudioFormat.encoding;
-        // We only handle PCM_FLOAT; ExoPlayer will resample if needed
-        if (encoding != C.ENCODING_PCM_FLOAT) {
+        // 일반 음원은 16-bit로 들어옴 — float로 변환해 처리, 출력은 항상 float
+        if (encoding != C.ENCODING_PCM_FLOAT && encoding != C.ENCODING_PCM_16BIT) {
             throw new UnhandledAudioFormatException(inputAudioFormat);
         }
         if (!inputAudioFormat.equals(this.inputFormat)) {
             this.inputFormat = inputAudioFormat;
-            this.outputFormat = inputAudioFormat; // output same format
+            this.outputFormat = new AudioFormat(
+                    inputAudioFormat.sampleRate,
+                    inputAudioFormat.channelCount,
+                    C.ENCODING_PCM_FLOAT);
             recreateSoundTouch();
         }
         return outputFormat;
@@ -79,14 +82,20 @@ public class SoundTouchProcessor implements AudioProcessor {
         if (stHandle == 0 || !buffer.hasRemaining()) return;
 
         int bytesAvail = buffer.remaining();
-        // Each float = 4 bytes
-        int floatCount = bytesAvail / 4;
-
-        float[] samples = new float[floatCount];
-        buffer.asFloatBuffer().get(samples);
+        float[] samples;
+        if (inputFormat.encoding == C.ENCODING_PCM_16BIT) {
+            int shortCount = bytesAvail / 2;
+            samples = new float[shortCount];
+            java.nio.ShortBuffer sb = buffer.asShortBuffer();
+            for (int i = 0; i < shortCount; i++) samples[i] = sb.get(i) / 32768f;
+        } else {
+            int floatCount = bytesAvail / 4;
+            samples = new float[floatCount];
+            buffer.asFloatBuffer().get(samples);
+        }
         buffer.position(buffer.position() + bytesAvail);
 
-        int samplesPerChannel = floatCount / inputFormat.channelCount;
+        int samplesPerChannel = samples.length / inputFormat.channelCount;
         st_putSamples(stHandle, samples, samplesPerChannel);
 
         drainToOutputBuffer();

@@ -60,6 +60,7 @@
 		<AndroidLibrary Include="Platforms\Android\libs-ytdlp\jackson-annotations-2.11.1.jar" Bind="false" />
 		<AndroidLibrary Include="Platforms\Android\libs-ytdlp\jackson-core-2.11.1.jar" Bind="false" />
 		<AndroidLibrary Include="Platforms\Android\libs-ytdlp\commons-io-2.5.jar" Bind="false" />
+		<AndroidLibrary Include="Platforms\Android\libs-ytdlp\commons-compress-1.12.jar" Bind="false" />
 		<!-- kotlin-stdlib/annotations jar 제외: MAUI(AndroidX) 번들에 이미 포함되어 dex 중복 발생 -->
 	</ItemGroup>
 

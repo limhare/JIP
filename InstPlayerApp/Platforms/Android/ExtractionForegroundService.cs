@@ -31,15 +31,18 @@ public class ExtractionForegroundService : Service
         // API 29+(Android 10)부터 foreground service type 지정 가능
         // FOREGROUND_SERVICE_TYPE_DATA_SYNC = 0x1
         if (Build.VERSION.SdkInt >= BuildVersionCodes.Q)
-            StartForeground(NotifId, BuildNotification("반주 추출 중...", 0),
+            StartForeground(NotifId, BuildNotification("작업 진행 중...", 0),
                 (Android.Content.PM.ForegroundService)0x1);
         else
-            StartForeground(NotifId, BuildNotification("반주 추출 중...", 0));
+            StartForeground(NotifId, BuildNotification("작업 진행 중...", 0));
         return StartCommandResult.NotSticky;
     }
 
     public void UpdateProgress(int pct)
-        => _nm?.Notify(NotifId, BuildNotification($"반주 추출 중... {pct}%", pct));
+        => _nm?.Notify(NotifId, BuildNotification($"작업 진행 중... {pct}%", pct));
+
+    public void UpdateText(string text, int pct)
+        => _nm?.Notify(NotifId, BuildNotification(text, pct));
 
     public override void OnDestroy()
     {
@@ -52,7 +55,7 @@ public class ExtractionForegroundService : Service
 
     private Notification BuildNotification(string text, int pct)
         => new NotificationCompat.Builder(this, ChannelId)
-            .SetContentTitle("JIP - 반주 추출")
+            .SetContentTitle("JIP")
             .SetContentText(text)
             .SetSmallIcon(Android.Resource.Drawable.IcMediaPlay)
             .SetProgress(100, pct, pct == 0)
