@@ -62,6 +62,14 @@ internal class SoundTouchBridge : IDisposable
     {
         if (_builderRef != nint.Zero)
         {
+            try
+            {
+                var releaseId = JNIEnv.GetMethodID(_builderClass, "release", "()V");
+                JNIEnv.CallVoidMethod(_builderRef, releaseId);
+            }
+            catch
+            {
+            }
             JNIEnv.DeleteGlobalRef(_builderRef);
             _builderRef = nint.Zero;
         }

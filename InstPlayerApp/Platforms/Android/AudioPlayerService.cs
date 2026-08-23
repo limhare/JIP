@@ -79,6 +79,23 @@ public class AudioPlayerService : IAudioPlayerService
         _player.Volume = 1.0f;
     }
 
+    private bool _playbackServiceRunning;
+
+    private void SetPlaybackServiceActive(bool active)
+    {
+        try
+        {
+            if (active == _playbackServiceRunning) return;
+            var intent = new Intent(_context, typeof(PlaybackForegroundService));
+            if (active) _context.StartForegroundService(intent);
+            else _context.StopService(intent);
+            _playbackServiceRunning = active;
+        }
+        catch
+        {
+        }
+    }
+
     public void LoadAndPlay(string filePath)
     {
         EnsurePlayer();
@@ -96,6 +113,7 @@ public class AudioPlayerService : IAudioPlayerService
         _player.Prepare();
         _player.Play();
         Status = PlaybackStatus.Playing;
+        SetPlaybackServiceActive(true);
     }
 
     public void Play()
@@ -103,6 +121,7 @@ public class AudioPlayerService : IAudioPlayerService
         if (_player == null) return;
         _player.Play();
         Status = PlaybackStatus.Playing;
+        SetPlaybackServiceActive(true);
     }
 
     public void Pause()
@@ -110,6 +129,7 @@ public class AudioPlayerService : IAudioPlayerService
         if (_player == null) return;
         _player.Pause();
         Status = PlaybackStatus.Paused;
+        SetPlaybackServiceActive(false);
     }
 
     public void Stop()
@@ -118,6 +138,7 @@ public class AudioPlayerService : IAudioPlayerService
         _player.Stop();
         _player.SeekTo(0);
         Status = PlaybackStatus.Stopped;
+        SetPlaybackServiceActive(false);
     }
 
     public void SeekTo(TimeSpan position)
@@ -208,6 +229,7 @@ public class AudioPlayerService : IAudioPlayerService
     internal void OnStateEnded()
     {
         Status = PlaybackStatus.Stopped;
+        SetPlaybackServiceActive(false);
         PlaybackEnded?.Invoke();
     }
 

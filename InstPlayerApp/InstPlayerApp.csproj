@@ -105,9 +105,9 @@
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.0" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
 		<PackageReference Include="CommunityToolkit.Maui" Version="11.1.0" />
-		<PackageReference Include="Xamarin.AndroidX.Media3.ExoPlayer" Version="1.6.0.1" />
+		<PackageReference Include="Xamarin.AndroidX.Media3.ExoPlayer" Version="1.6.1.2" />
+		<PackageReference Include="Xamarin.AndroidX.Media3.Session" Version="1.6.1.2" />
 		<PackageReference Include="TagLibSharp" Version="2.3.0" />
-		<PackageReference Include="YoutubeExplode" Version="6.6.1" />
 	</ItemGroup>
 
 </Project>
