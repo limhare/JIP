@@ -1246,8 +1246,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
             string template = Path.Combine(root, "%(title)s", "%(title)s.%(ext)s");
 
             using var dl = new Platforms.Android.YtDlpDownloader();
+            bool dlFinished = false; // 늦게 도착한 진행률 콜백이 완료 표시를 덮지 않게
             var prog = new Progress<int>(p =>
             {
+                if (dlFinished) return;
                 YoutubeProgress = p;
                 YoutubeStatusText = $"다운로드 중... {p}%";
             });
@@ -1269,6 +1271,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 .ToList();
             if (newFiles.Count == 0) throw new Exception("다운로드된 파일을 찾을 수 없습니다.");
 
+            dlFinished = true;
             YoutubeProgress = 100;
             YoutubeStatusText = $"완료: {Path.GetFileName(newFiles[0])}";
             foreach (var nf in newFiles)
@@ -1277,6 +1280,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
                     Playlist.Add(new PlaylistItem { FilePath = nf });
             }
             YoutubeUrl = "";
+
+            // PC와 동일하게: 받은 곡을 바로 재생 (리스트 하단에 있어도 바로 확인 가능)
+            int newIdx = -1;
+            for (int i = 0; i < Playlist.Count; i++)
+                if (Playlist[i].FilePath == newFiles[0]) { newIdx = i; break; }
+            if (newIdx >= 0) PlayTrack(newIdx);
 #else
             await Task.CompletedTask;
             throw new Exception("Android 전용");

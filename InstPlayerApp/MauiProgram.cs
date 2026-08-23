@@ -33,6 +33,8 @@ public static class MauiProgram
         // 드래그 리오더 롱프레스 딜레이를 500ms → 150ms로 단축
         CollectionViewHandler.Mapper.AppendToMapping("FastDrag", (handler, view) =>
         {
+            // 폰: 빠른 드래그(150ms 롱프레스)가 스크롤을 방해하므로 기본(500ms) 유지
+            if (DeviceInfo.Idiom == DeviceIdiom.Phone) return;
             if (view is not CollectionView cv || !cv.CanReorderItems) return;
             if (handler.PlatformView is not AndroidX.RecyclerView.Widget.RecyclerView rv) return;
 

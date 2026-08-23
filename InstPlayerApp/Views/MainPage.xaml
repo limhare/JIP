@@ -611,113 +611,89 @@
                              Padding="12,4,12,16" Spacing="6"
                              BackgroundColor="#252526">
 
-            <!-- Pitch / Tempo -->
-            <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,4">
-                <Button Grid.Column="0" Text="-" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
-                        WidthRequest="{OnIdiom Phone=52, Default=72}" HeightRequest="{OnIdiom Phone=52, Default=72}" FontSize="{OnIdiom Phone=24, Default=32}" Padding="0"
-                        VerticalOptions="Center"
-                        Command="{Binding PitchDownCommand}" />
-                <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="0">
-                    <Label Text="{Binding PitchText}" TextColor="#4A9EFF" FontSize="12"
-                           HorizontalOptions="Center" FontAttributes="Bold" />
-                    <Slider Minimum="-8" Maximum="8"
-                            Value="{Binding Pitch}"
-                            DragCompleted="OnPitchDragCompleted"
-                            ThumbColor="#4A9EFF" MinimumTrackColor="#4A9EFF" MaximumTrackColor="#444" />
-                    <Grid ColumnDefinitions="*,*,*,*,*">
-                        <Label Grid.Column="0" Text="-8" HorizontalOptions="Start" TextColor="#666" FontSize="11" />
-                        <Label Grid.Column="1" Text="-4" HorizontalOptions="Center" TextColor="#666" FontSize="11" />
-                        <Label Grid.Column="2" Text="0" HorizontalOptions="Center" TextColor="#4A9EFF" FontSize="12" FontAttributes="Bold" />
-                        <Label Grid.Column="3" Text="+4" HorizontalOptions="Center" TextColor="#666" FontSize="11" />
-                        <Label Grid.Column="4" Text="+8" HorizontalOptions="End" TextColor="#666" FontSize="11" />
+            <!-- Pitch / Tempo (왼쪽) + 세로 볼륨 (오른쪽) -->
+            <Grid ColumnDefinitions="*,48" ColumnSpacing="4" Margin="0,4,0,0">
+                <VerticalStackLayout Grid.Column="0" Spacing="4">
+                    <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                        <Button Grid.Column="0" Text="-" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                                WidthRequest="{OnIdiom Phone=48, Default=72}" HeightRequest="{OnIdiom Phone=48, Default=72}" FontSize="{OnIdiom Phone=22, Default=32}" Padding="0"
+                                VerticalOptions="Center"
+                                Command="{Binding PitchDownCommand}" />
+                        <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="0">
+                            <Label Text="{Binding PitchText}" TextColor="#4A9EFF" FontSize="12"
+                                   HorizontalOptions="Center" FontAttributes="Bold" />
+                            <Slider Minimum="-8" Maximum="8"
+                                    Value="{Binding Pitch}"
+                                    DragCompleted="OnPitchDragCompleted"
+                                    ThumbColor="#4A9EFF" MinimumTrackColor="#4A9EFF" MaximumTrackColor="#444" />
+                            <Grid ColumnDefinitions="*,*,*,*,*">
+                                <Label Grid.Column="0" Text="-8" HorizontalOptions="Start" TextColor="#666" FontSize="10" />
+                                <Label Grid.Column="1" Text="-4" HorizontalOptions="Center" TextColor="#666" FontSize="10" />
+                                <Label Grid.Column="2" Text="0" HorizontalOptions="Center" TextColor="#4A9EFF" FontSize="11" FontAttributes="Bold" />
+                                <Label Grid.Column="3" Text="+4" HorizontalOptions="Center" TextColor="#666" FontSize="10" />
+                                <Label Grid.Column="4" Text="+8" HorizontalOptions="End" TextColor="#666" FontSize="10" />
+                            </Grid>
+                        </VerticalStackLayout>
+                        <Button Grid.Column="2" Text="+" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                                WidthRequest="{OnIdiom Phone=48, Default=72}" HeightRequest="{OnIdiom Phone=48, Default=72}" FontSize="{OnIdiom Phone=22, Default=32}" Padding="0"
+                                VerticalOptions="Center"
+                                Command="{Binding PitchUpCommand}" />
+                        <Button Grid.Column="3" Text="RST" BackgroundColor="#2D2D30" TextColor="#4EC9B0"
+                                HeightRequest="{OnIdiom Phone=48, Default=72}" FontSize="{OnIdiom Phone=13, Default=18}" Padding="0"
+                                VerticalOptions="Center"
+                                Command="{Binding PitchResetCommand}" />
+                    </Grid>
+
+                    <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                        <Button Grid.Column="0" Text="-" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                                WidthRequest="{OnIdiom Phone=48, Default=72}" HeightRequest="{OnIdiom Phone=48, Default=72}" FontSize="{OnIdiom Phone=22, Default=32}" Padding="0"
+                                VerticalOptions="Center"
+                                Command="{Binding TempoDownCommand}" />
+                        <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="0">
+                            <Label Text="{Binding TempoText}" TextColor="#4A9EFF" FontSize="12"
+                                   HorizontalOptions="Center" FontAttributes="Bold" />
+                            <Slider Minimum="-100" Maximum="100"
+                                    Value="{Binding Tempo}"
+                                    ThumbColor="#4A9EFF" MinimumTrackColor="#4A9EFF" MaximumTrackColor="#444" />
+                            <Grid ColumnDefinitions="*,*,*,*,*">
+                                <Label Grid.Column="0" Text="0%" HorizontalOptions="Start" TextColor="#666" FontSize="10" />
+                                <Label Grid.Column="1" Text="50%" HorizontalOptions="Center" TextColor="#666" FontSize="10" />
+                                <Label Grid.Column="2" Text="100%" HorizontalOptions="Center" TextColor="#4A9EFF" FontSize="11" FontAttributes="Bold" />
+                                <Label Grid.Column="3" Text="150%" HorizontalOptions="Center" TextColor="#666" FontSize="10" />
+                                <Label Grid.Column="4" Text="200%" HorizontalOptions="End" TextColor="#666" FontSize="10" />
+                            </Grid>
+                        </VerticalStackLayout>
+                        <Button Grid.Column="2" Text="+" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                                WidthRequest="{OnIdiom Phone=48, Default=72}" HeightRequest="{OnIdiom Phone=48, Default=72}" FontSize="{OnIdiom Phone=22, Default=32}" Padding="0"
+                                VerticalOptions="Center"
+                                Command="{Binding TempoUpCommand}" />
+                        <Button Grid.Column="3" Text="RST" BackgroundColor="#2D2D30" TextColor="#4EC9B0"
+                                HeightRequest="{OnIdiom Phone=48, Default=72}" FontSize="{OnIdiom Phone=13, Default=18}" Padding="0"
+                                VerticalOptions="Center"
+                                Command="{Binding TempoResetCommand}" />
                     </Grid>
                 </VerticalStackLayout>
-                <Button Grid.Column="2" Text="+" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
-                        WidthRequest="{OnIdiom Phone=52, Default=72}" HeightRequest="{OnIdiom Phone=52, Default=72}" FontSize="{OnIdiom Phone=24, Default=32}" Padding="0"
-                        VerticalOptions="Center"
-                        Command="{Binding PitchUpCommand}" />
-                <Button Grid.Column="3" Text="RST" BackgroundColor="#2D2D30" TextColor="#4EC9B0"
-                        HeightRequest="{OnIdiom Phone=52, Default=72}" FontSize="{OnIdiom Phone=14, Default=18}" Padding="0"
-                        VerticalOptions="Center"
-                        Command="{Binding PitchResetCommand}" />
-            </Grid>
 
-            <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,0,0,4">
-                <Button Grid.Column="0" Text="-" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
-                        WidthRequest="{OnIdiom Phone=52, Default=72}" HeightRequest="{OnIdiom Phone=52, Default=72}" FontSize="{OnIdiom Phone=24, Default=32}" Padding="0"
-                        VerticalOptions="Center"
-                        Command="{Binding TempoDownCommand}" />
-                <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="0">
-                    <Label Text="{Binding TempoText}" TextColor="#4A9EFF" FontSize="12"
-                           HorizontalOptions="Center" FontAttributes="Bold" />
-                    <Slider Minimum="-100" Maximum="100"
-                            Value="{Binding Tempo}"
-                            ThumbColor="#4A9EFF" MinimumTrackColor="#4A9EFF" MaximumTrackColor="#444" />
-                    <Grid ColumnDefinitions="*,*,*,*,*">
-                        <Label Grid.Column="0" Text="0%" HorizontalOptions="Start" TextColor="#666" FontSize="11" />
-                        <Label Grid.Column="1" Text="50%" HorizontalOptions="Center" TextColor="#666" FontSize="11" />
-                        <Label Grid.Column="2" Text="100%" HorizontalOptions="Center" TextColor="#4A9EFF" FontSize="12" FontAttributes="Bold" />
-                        <Label Grid.Column="3" Text="150%" HorizontalOptions="Center" TextColor="#666" FontSize="11" />
-                        <Label Grid.Column="4" Text="200%" HorizontalOptions="End" TextColor="#666" FontSize="11" />
+                <!-- 세로 볼륨 -->
+                <VerticalStackLayout Grid.Column="1" Spacing="0" VerticalOptions="Center" HorizontalOptions="Center">
+                    <Button Text="{Binding VolumeIcon}" FontSize="17"
+                            BackgroundColor="Transparent" TextColor="#E1E1E1"
+                            WidthRequest="40" HeightRequest="34" Padding="0"
+                            Command="{Binding ToggleMuteCommand}" />
+                    <Grid WidthRequest="44" HeightRequest="{OnIdiom Phone=88, Default=120}">
+                        <Slider Rotation="-90" WidthRequest="{OnIdiom Phone=88, Default=120}"
+                                Minimum="0" Maximum="100" Value="{Binding Volume}"
+                                ThumbColor="#4EC9B0" MinimumTrackColor="#4EC9B0" MaximumTrackColor="#444"
+                                HorizontalOptions="Center" VerticalOptions="Center" />
                     </Grid>
+                    <Label Text="{Binding VolumeText}" TextColor="#999" FontSize="10"
+                           HorizontalOptions="Center" />
                 </VerticalStackLayout>
-                <Button Grid.Column="2" Text="+" BackgroundColor="#2D2D30" TextColor="#E1E1E1"
-                        WidthRequest="{OnIdiom Phone=52, Default=72}" HeightRequest="{OnIdiom Phone=52, Default=72}" FontSize="{OnIdiom Phone=24, Default=32}" Padding="0"
-                        VerticalOptions="Center"
-                        Command="{Binding TempoUpCommand}" />
-                <Button Grid.Column="3" Text="RST" BackgroundColor="#2D2D30" TextColor="#4EC9B0"
-                        HeightRequest="{OnIdiom Phone=52, Default=72}" FontSize="{OnIdiom Phone=14, Default=18}" Padding="0"
-                        VerticalOptions="Center"
-                        Command="{Binding TempoResetCommand}" />
-            </Grid>
-
-            <!-- Volume -->
-            <Grid ColumnDefinitions="44,*,50">
-                <Button Grid.Column="0" Text="{Binding VolumeIcon}" FontSize="28"
-                        BackgroundColor="Transparent" TextColor="#E1E1E1"
-                        WidthRequest="44" HeightRequest="44" Padding="0"
-                        Command="{Binding ToggleMuteCommand}" />
-                <Slider Grid.Column="1" Minimum="0" Maximum="100"
-                        Value="{Binding Volume}"
-                        ThumbColor="#4EC9B0" MinimumTrackColor="#4EC9B0" MaximumTrackColor="#444" />
-                <Label Grid.Column="2" Text="{Binding VolumeText}" TextColor="#999" FontSize="11"
-                       HorizontalOptions="End" VerticalOptions="Center" />
             </Grid>
 
             <!-- AB info -->
-            <Label Text="{Binding AbInfoText}" TextColor="#FF8C00" FontSize="14"
+            <Label Text="{Binding AbInfoText}" TextColor="#FF8C00" FontSize="12"
                    HorizontalOptions="Center" FontAttributes="Bold" />
-
-            <!-- Export MP3 + HQ Export + Open Folder -->
-            <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="4"
-                  IsVisible="{Binding IsExporting, Converter={StaticResource InvertBool}}">
-                <Button Grid.Column="0" Text="MP3"
-                        Command="{Binding ExportMp3Command}"
-                        BackgroundColor="#2D2D30" TextColor="#4EC9B0"
-                        FontSize="14" HeightRequest="40" CornerRadius="8" />
-                <Border Grid.Column="1" StrokeThickness="2" Padding="0"
-                        StrokeShape="RoundRectangle 8,8,8,8">
-                    <Border.Stroke>
-                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                            <GradientStop Color="#FF0000" Offset="0.0" />
-                            <GradientStop Color="#FF8000" Offset="0.17" />
-                            <GradientStop Color="#FFFF00" Offset="0.33" />
-                            <GradientStop Color="#00FF00" Offset="0.5" />
-                            <GradientStop Color="#0080FF" Offset="0.67" />
-                            <GradientStop Color="#8000FF" Offset="0.83" />
-                            <GradientStop Color="#FF0080" Offset="1.0" />
-                        </LinearGradientBrush>
-                    </Border.Stroke>
-                    <Button Text="HQ MP3"
-                            Command="{Binding ExportMp3HQCommand}"
-                            BackgroundColor="#2D2D30" TextColor="#FFD700"
-                            FontSize="14" HeightRequest="40" CornerRadius="6" />
-                </Border>
-                <Button Grid.Column="2" Text="📂" FontSize="16"
-                        BackgroundColor="#2D2D30" TextColor="#E1E1E1"
-                        WidthRequest="44" HeightRequest="40" CornerRadius="8"
-                        Command="{Binding OpenExportFolderCommand}" />
-            </Grid>
             <VerticalStackLayout IsVisible="{Binding IsExporting}" Spacing="2">
                 <Label Text="{Binding ExportStatusText}" TextColor="#4A9EFF" FontSize="12"
                        HorizontalOptions="Center" />
@@ -725,27 +701,35 @@
                              ProgressColor="#4A9EFF" HeightRequest="6" />
             </VerticalStackLayout>
 
-            <!-- Recording: 마이크 / 반주+마이크 -->
-            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="4">
-                <Button Grid.Column="0" Text="{Binding RecordModeText}"
+            <!-- HQ내보내기 + 폴더 + 녹음 통합 라인 -->
+            <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto" ColumnSpacing="4">
+                <Button Grid.Column="0" Text="HQ"
+                        Command="{Binding ExportMp3HQCommand}"
+                        BackgroundColor="#2D2D30" TextColor="#FFD700"
+                        FontSize="13" HeightRequest="36" CornerRadius="8" Padding="12,0" />
+                <Button Grid.Column="1" Text="📂" FontSize="14"
+                        BackgroundColor="#2D2D30" TextColor="#E1E1E1"
+                        WidthRequest="40" HeightRequest="36" CornerRadius="8" Padding="0"
+                        Command="{Binding OpenExportFolderCommand}" />
+                <Button Grid.Column="2" Text="{Binding RecordModeText}"
                         Command="{Binding ToggleRecordModeCommand}"
                         BackgroundColor="#2D2D30" TextColor="#E1E1E1"
-                        FontSize="13" HeightRequest="40" CornerRadius="8" Padding="10,0" />
-                <Button Grid.Column="1" Text="{Binding RecordButtonText}"
+                        FontSize="12" HeightRequest="36" CornerRadius="8" Padding="8,0" />
+                <Button Grid.Column="3" Text="{Binding RecordButtonText}"
                         Command="{Binding ToggleRecordCommand}"
                         BackgroundColor="#2D2D30" TextColor="#FF5555"
-                        FontSize="14" HeightRequest="40" CornerRadius="8" />
-                <Button Grid.Column="2" Text="{Binding RecordSyncText}"
+                        FontSize="13" HeightRequest="36" CornerRadius="8" />
+                <Button Grid.Column="4" Text="{Binding RecordSyncText}"
                         Command="{Binding AdjustRecordSyncCommand}"
                         BackgroundColor="#2D2D30" TextColor="#4EC9B0"
-                        FontSize="12" HeightRequest="40" CornerRadius="8" Padding="8,0" />
-                <Label Grid.Column="3" Text="{Binding RecordStatusText}" TextColor="#4A9EFF"
-                       FontSize="12" VerticalOptions="Center" />
+                        FontSize="11" HeightRequest="36" CornerRadius="8" Padding="6,0" />
             </Grid>
+            <Label Text="{Binding RecordStatusText}" TextColor="#4A9EFF" FontSize="11"
+                   HorizontalOptions="Center" />
 
             <!-- Main Playback Controls (Row 1) -->
-            <Grid ColumnDefinitions="*,*,1.6*,*,*" ColumnSpacing="6" HeightRequest="{OnIdiom Phone=56, Default=84}">
-                <Button Grid.Column="0" Text="{Binding RepeatIcon}" FontSize="18" Padding="0"
+            <Grid ColumnDefinitions="*,*,1.6*,*,*" ColumnSpacing="6" HeightRequest="{OnIdiom Phone=44, Default=84}">
+                <Button Grid.Column="0" Text="{Binding RepeatIcon}" FontSize="{OnIdiom Phone=14, Default=18}" Padding="0"
                         BackgroundColor="{Binding RepeatBgColor}"
                         TextColor="White" CornerRadius="42"
                         Command="{Binding CycleRepeatCommand}" />
@@ -758,18 +742,18 @@
                 <Button Grid.Column="3" Text="&#x23ED;" FontSize="{OnIdiom Phone=22, Default=30}" Padding="0"
                         BackgroundColor="#2D2D30" TextColor="#E1E1E1" CornerRadius="42"
                         Command="{Binding NextTrackCommand}" />
-                <Button Grid.Column="4" Text="&#x25A0;" FontSize="28" Padding="0"
+                <Button Grid.Column="4" Text="&#x25A0;" FontSize="{OnIdiom Phone=18, Default=28}" Padding="0"
                         BackgroundColor="#2D2D30" TextColor="White" CornerRadius="42"
                         Command="{Binding StopPlaybackCommand}" />
             </Grid>
 
             <!-- Toggles + AB (Row 2) -->
-            <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="6" HeightRequest="68">
-                <Button Grid.Column="0" Text="Random" FontSize="14" Padding="0"
+            <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="6" HeightRequest="{OnIdiom Phone=38, Default=68}">
+                <Button Grid.Column="0" Text="Random" FontSize="{OnIdiom Phone=12, Default=14}" Padding="0"
                         BackgroundColor="{Binding ShuffleMode, Converter={StaticResource BoolToActiveColor}}"
                         TextColor="White" CornerRadius="34"
                         Command="{Binding ToggleShuffleCommand}" />
-                <Button Grid.Column="1" Text="A" FontSize="22" Padding="0"
+                <Button Grid.Column="1" Text="A" FontSize="{OnIdiom Phone=15, Default=22}" Padding="0"
                         BackgroundColor="#2D2D30" TextColor="#E1E1E1" CornerRadius="34"
                         Command="{Binding SetPointACommand}">
                     <Button.Triggers>
@@ -779,7 +763,7 @@
                         </DataTrigger>
                     </Button.Triggers>
                 </Button>
-                <Button Grid.Column="2" Text="B" FontSize="22" Padding="0"
+                <Button Grid.Column="2" Text="B" FontSize="{OnIdiom Phone=15, Default=22}" Padding="0"
                         BackgroundColor="#2D2D30" TextColor="#E1E1E1" CornerRadius="34"
                         Command="{Binding SetPointBCommand}">
                     <Button.Triggers>
@@ -789,7 +773,7 @@
                         </DataTrigger>
                     </Button.Triggers>
                 </Button>
-                <Button Grid.Column="3" Text="CLR" FontSize="20" Padding="0"
+                <Button Grid.Column="3" Text="CLR" FontSize="{OnIdiom Phone=14, Default=20}" Padding="0"
                         BackgroundColor="#2D2D30" TextColor="#E74C3C" CornerRadius="34"
                         Command="{Binding ClearABCommand}" />
             </Grid>
