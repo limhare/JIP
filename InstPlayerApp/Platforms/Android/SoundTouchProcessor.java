@@ -63,10 +63,8 @@ public class SoundTouchProcessor implements AudioProcessor {
         }
         if (!inputAudioFormat.equals(this.inputFormat)) {
             this.inputFormat = inputAudioFormat;
-            this.outputFormat = new AudioFormat(
-                    inputAudioFormat.sampleRate,
-                    inputAudioFormat.channelCount,
-                    C.ENCODING_PCM_FLOAT);
+            // 출력 형식은 입력과 동일하게 유지 — 싱크 내부 후속 프로세서(무음스킵 등)가 16-bit만 받음
+            this.outputFormat = inputAudioFormat;
             recreateSoundTouch();
         }
         return outputFormat;
@@ -160,10 +158,23 @@ public class SoundTouchProcessor implements AudioProcessor {
         int received = st_receiveSamples(stHandle, outFloats, available);
 
         if (received > 0) {
-            int byteCount = received * inputFormat.channelCount * 4;
-            outputBuffer = ByteBuffer.allocateDirect(byteCount).order(ByteOrder.nativeOrder());
-            outputBuffer.asFloatBuffer().put(outFloats, 0, received * inputFormat.channelCount);
-            outputBuffer.limit(byteCount);
+            int samples = received * inputFormat.channelCount;
+            if (inputFormat.encoding == C.ENCODING_PCM_16BIT) {
+                int byteCount = samples * 2;
+                ByteBuffer out = ByteBuffer.allocateDirect(byteCount).order(ByteOrder.nativeOrder());
+                for (int i = 0; i < samples; i++) {
+                    float v = outFloats[i];
+                    if (v > 1f) v = 1f; else if (v < -1f) v = -1f;
+                    out.putShort((short) (v * 32767f));
+                }
+                out.flip();
+                outputBuffer = out;
+            } else {
+                int byteCount = samples * 4;
+                outputBuffer = ByteBuffer.allocateDirect(byteCount).order(ByteOrder.nativeOrder());
+                outputBuffer.asFloatBuffer().put(outFloats, 0, samples);
+                outputBuffer.limit(byteCount);
+            }
         }
     }
 }
