@@ -151,10 +151,30 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         _audio.PlaybackEnded += OnPlaybackEnded;
         _audio.LevelUpdated += level => VuLevel = level;
+        _audio.StatusChanged += _ => RefreshPlayPauseIcon();
+        _audio.CurrentItemChanged += OnEngineItemChanged;
+    }
+
+    // 앱 밖(Android Auto 대기열 등)에서 곡이 바뀌면 화면의 현재 곡/가사를 맞춘다
+    private void OnEngineItemChanged(string? path)
+    {
+        if (string.IsNullOrEmpty(path)) return;
+        if (_currentPlayingItem != null && _currentPlayingItem.FilePath == path) return;
+        SaveCurrentLyrics();
+        var item = Playlist.FirstOrDefault(p => p.FilePath == path);
+        _currentPlayingItem = item;
+        CurrentIndex = item != null ? Playlist.IndexOf(item) : -1;
+        for (int i = 0; i < Playlist.Count; i++)
+            Playlist[i].IsSelected = Playlist[i] == item;
+        NowPlayingText = Path.GetFileNameWithoutExtension(path);
+        LoadLyrics(path);
+        RefreshPlayPauseIcon();
     }
 
     public void StartTimer(IDispatcher dispatcher)
     {
+        // 페이지가 다시 나타날 때마다 호출된다 — 타이머가 겹치면 A-B 반복 점프가 중복 실행됨
+        if (_progressTimer != null) return;
         _progressTimer = dispatcher.CreateTimer();
         _progressTimer.Interval = TimeSpan.FromMilliseconds(200);
         _progressTimer.Tick += OnProgressTick;
@@ -164,6 +184,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private void OnProgressTick(object? sender, EventArgs e)
     {
         if (_audio.Status != PlaybackStatus.Playing) return;
+
+        // Android Auto 키 버튼으로 엔진 키가 바뀌었으면 화면 값도 맞춤 (엔진에 다시 보내지 않음)
+        int enginePitch = _audio.GetEnginePitch();
+        if (enginePitch != Pitch)
+        {
+            _syncingPitch = true;
+            try { Pitch = enginePitch; }
+            finally { _syncingPitch = false; }
+        }
 
         var pos = _audio.Position;
         var dur = _audio.Duration;
@@ -209,6 +238,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         if (_audio.Status == PlaybackStatus.Playing)
         {
+            // \uBC18\uC8FC+\uB9C8\uC774\uD06C \uB179\uC74C \uC911 \uC77C\uC2DC\uC815\uC9C0\uD558\uBA74 \uBC18\uC8FC(\uD0ED)\uB294 \uBA48\uCD94\uACE0 \uB9C8\uC774\uD06C\uB294 \uACC4\uC18D \uB179\uC74C\uB3FC \uC2F1\uD06C\uAC00 \uC5B4\uAE0B\uB09C\uB2E4
+            if (IsRecording && RecordMixMode)
+            {
+                RecordStatusText = "\uB179\uC74C \uC911\uC5D4 \uC77C\uC2DC\uC815\uC9C0 \uB300\uC2E0 \u25A0 \uC911\uC9C0\uB97C \uB20C\uB7EC\uC8FC\uC138\uC694";
+                return;
+            }
             _audio.Pause();
             PlayPauseIcon = "\u25B6";
         }
@@ -284,10 +319,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
         var item = Playlist[index];
         _currentPlayingItem = item; // 참조 저장 (리오더 시 인덱스 추적용)
         _audio.LoadAndPlay(item.FilePath);
-        // 녹음 파일은 파일 자체에 키/템포가 반영되어 있으므로 항상 원키·원속도로 재생
+        // 녹음 파일의 원키·원속도 재생은 엔진(Java)이 곡 전환 시 처리 — 여기선 사용자 값만 보낸다
+        // (녹음 재생 때 0을 보내면 사용자 키가 0으로 덮여 다음 곡까지 원키로 나옴)
         bool isRecFile = item.FileName.Contains("_REC_") ||
                          Path.GetFileName(Path.GetDirectoryName(item.FilePath) ?? "") == "녹음";
-        _audio.SetPitchTempo(isRecFile ? 0 : Pitch, isRecFile ? 0f : Tempo);
+        _audio.SetPitchTempo(Pitch, Tempo);
 
         NowPlayingText = item.DisplayName + (isRecFile && (Pitch != 0 || (int)Tempo != 0) ? " [원키]" : "");
         PlayPauseIcon = "\u25AE\u25AE";
@@ -309,16 +345,28 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     // ── Pitch / Tempo ──
 
+    private bool _syncingPitch;
+
     partial void OnPitchChanged(int value)
     {
         PitchText = value.ToString("+0;-0;0");
+        if (_syncingPitch) return;
         _audio.SetPitchTempo(value, Tempo);
+        ClearOriginalKeyLabel();
     }
 
     partial void OnTempoChanged(float value)
     {
         TempoText = $"{100 + (int)value}%";
         _audio.SetPitchTempo(Pitch, value);
+        ClearOriginalKeyLabel();
+    }
+
+    // 녹음 재생 중 키/속도를 직접 바꾸면 수동 조절로 전환되므로 [원키] 표시를 뗀다
+    private void ClearOriginalKeyLabel()
+    {
+        if (NowPlayingText.EndsWith(" [원키]"))
+            NowPlayingText = NowPlayingText[..^" [원키]".Length];
     }
 
     [RelayCommand] private void PitchUp() { if (Pitch < 8) Pitch++; }
@@ -654,6 +702,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
             }
         }
 
+        // 화면이 꺼져도 마이크가 무음 처리되지 않도록 마이크 타입 포그라운드 서비스 (앱이 화면에 있을 때 시작)
+        ForegroundJobs.AcquireRecording();
+
         // 믹스 모드: 출력 탭 시작 (지금 이어폰으로 나가는 소리 그대로 기록)
         _recTapActive = false;
         if (RecordMixMode)
@@ -671,6 +722,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             if (_recTapActive) { _audio.StopOutputCapture(); _recTapActive = false; }
             _micRecorder = null;
+            ForegroundJobs.ReleaseRecording();
             await Shell.Current.DisplayAlert("녹음 시작 실패", ex.Message, "확인");
             return;
         }
@@ -681,11 +733,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
         IsRecording = true;
         RecordButtonText = "■ 중지";
         RecordStatusText = "녹음 중...";
-        // 녹음 중 화면 꺼짐/백그라운드 동결 방지
-        Android.App.Application.Context.StartForegroundService(
-            new Android.Content.Intent(Android.App.Application.Context,
-                typeof(ExtractionForegroundService)));
     }
+
+    // 녹음 파일명 "{yyMMdd_HHmmss}_REC_{곡}" 의 곡 부분 (녹음본을 틀고 다시 녹음해도 접두사가 쌓이지 않게)
+    private static string StripRecPrefix(string name) =>
+        System.Text.RegularExpressions.Regex.Replace(name, @"^(\d{6}_\d{6}_REC_)+", "");
 
     private async Task StopRecordingAsync()
     {
@@ -699,7 +751,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             _micRecorder.Dispose();
             _micRecorder = null;
+            ForegroundJobs.ReleaseRecording();
         }
+        ForegroundJobs.AcquireWork(); // 저장(믹스/인코딩) 중 화면이 꺼져도 계속
         string tapWav = "";
         if (_recTapActive)
         {
@@ -723,14 +777,16 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 string cp = Playlist[basisIdx].FilePath;
                 if (!cp.StartsWith("content://") && !cp.StartsWith("http")) basisPath = cp;
             }
-            string songBase = !string.IsNullOrEmpty(basisPath)
+            string songBase = StripRecPrefix(!string.IsNullOrEmpty(basisPath)
                 ? Path.GetFileNameWithoutExtension(basisPath)
-                : ((basisIdx >= 0) ? Playlist[basisIdx].DisplayName : "untitled");
+                : ((basisIdx >= 0) ? Playlist[basisIdx].DisplayName : "untitled"));
             foreach (char c in Path.GetInvalidFileNameChars()) songBase = songBase.Replace(c, '_');
 
-            string outDir = !string.IsNullOrEmpty(basisPath)
-                ? Path.Combine(Path.GetDirectoryName(basisPath)!, "녹음")
-                : Path.Combine(FileSystem.AppDataDirectory, "Recordings");
+            // 녹음본을 틀어놓고 녹음했으면 같은 녹음 폴더에 (녹음\녹음\ 중첩 방지)
+            string? basisDir = !string.IsNullOrEmpty(basisPath) ? Path.GetDirectoryName(basisPath) : null;
+            string outDir = basisDir == null
+                ? Path.Combine(FileSystem.AppDataDirectory, "Recordings")
+                : (Path.GetFileName(basisDir) == "녹음" ? basisDir : Path.Combine(basisDir, "녹음"));
             Directory.CreateDirectory(outDir);
             string ts = DateTime.Now.ToString("yyMMdd_HHmmss");
             string outputPath = Path.Combine(outDir, $"{ts}_REC_{songBase}.mp3");
@@ -787,9 +843,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         finally
         {
             IsRecordSaving = false;
-            Android.App.Application.Context.StopService(
-                new Android.Content.Intent(Android.App.Application.Context,
-                    typeof(ExtractionForegroundService)));
+            ForegroundJobs.ReleaseWork();
         }
     }
 #endif
@@ -945,14 +999,20 @@ public partial class MainViewModel : ObservableObject, IDisposable
         catch { }
     }
 
+    // CurrentIndex는 CollectionChanged 핸들러가 _currentPlayingItem 기준으로 이미 다시 계산한다.
+    // 여기서 또 보정하면 이중으로 밀린다 — 재생 중인 곡을 지운 경우만 정지 처리.
     [RelayCommand]
     private void RemoveTrack(PlaylistItem? item)
     {
         if (item == null) return;
-        int idx = Playlist.IndexOf(item);
+        bool wasPlaying = ReferenceEquals(item, _currentPlayingItem);
+        if (wasPlaying) SaveCurrentLyrics();
         Playlist.Remove(item);
-        if (idx == CurrentIndex) StopPlayback();
-        else if (idx < CurrentIndex) CurrentIndex--;
+        if (wasPlaying)
+        {
+            StopPlayback();
+            CurrentIndex = -1;
+        }
     }
 
     public void PlaylistItemTapped(int index) => PlayTrack(index);
@@ -963,12 +1023,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         var selected = Playlist.Where(p => p.IsSelected).ToList();
         if (selected.Count == 0) return;
         foreach (var item in selected)
-        {
-            int idx = Playlist.IndexOf(item);
-            Playlist.Remove(item);
-            if (idx == CurrentIndex) StopPlayback();
-            else if (idx < CurrentIndex) CurrentIndex--;
-        }
+            RemoveTrack(item);
     }
 
     // ── Lyrics ──
@@ -996,62 +1051,117 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private void MigrateToSongFolders()
     {
-        try
-        {
-            string root = DownloadsDir;
-            if (!Directory.Exists(root)) return;
-            var moves = new Dictionary<string, string>();
+        string root = DownloadsDir;
+        if (!Directory.Exists(root)) return;
 
-            // 1) 루트에 평면으로 있는 곡 파일 → Downloads\{곡명}\ 로 이동
-            foreach (var f in Directory.GetFiles(root))
+        // 1) 루트에 평면으로 있는 곡 파일 → Downloads\{곡명}\ 로 이동 (파일 하나 실패해도 계속)
+        string[] rootFiles;
+        try { rootFiles = Directory.GetFiles(root); } catch { rootFiles = []; }
+        foreach (var f in rootFiles)
+        {
+            try
             {
                 if (!IsAudioFile(f)) continue;
-                var baseName = Path.GetFileNameWithoutExtension(f);
-                var folder = Path.Combine(root, SanitizeFolderName(baseName));
+                var folder = Path.Combine(root, SanitizeFolderName(Path.GetFileNameWithoutExtension(f)));
                 Directory.CreateDirectory(folder);
                 var dest = Path.Combine(folder, Path.GetFileName(f));
                 if (File.Exists(dest)) continue;
                 File.Move(f, dest);
-                moves[f] = dest;
                 // 기존 경로 기반 가사 파일 → 곡 폴더 가사.txt 로 승격
                 var oldLyrics = LyricsFilePath(f);
                 var sharedLyrics = Path.Combine(folder, "가사.txt");
                 if (File.Exists(oldLyrics) && !File.Exists(sharedLyrics))
                     File.Copy(oldLyrics, sharedLyrics);
             }
+            catch { }
+        }
 
-            // 2) 루트\녹음\ 에 쌓인 REC 파일 → 해당 곡 폴더\녹음\ 로 이동
-            var rootRec = Path.Combine(root, "녹음");
+        // 2) 루트\녹음\ 에 쌓인 REC 파일 → 해당 곡 폴더\녹음\ 로 이동
+        var rootRec = Path.Combine(root, "녹음");
+        try
+        {
             if (Directory.Exists(rootRec))
             {
                 foreach (var f in Directory.GetFiles(rootRec))
                 {
-                    var name = Path.GetFileNameWithoutExtension(f);
-                    var m = System.Text.RegularExpressions.Regex.Match(name, "_REC_(.+)$");
-                    if (!m.Success) continue;
-                    var songFolder = Path.Combine(root, SanitizeFolderName(m.Groups[1].Value));
-                    if (!Directory.Exists(songFolder)) continue;
-                    var recDir = Path.Combine(songFolder, "녹음");
-                    Directory.CreateDirectory(recDir);
-                    var dest = Path.Combine(recDir, Path.GetFileName(f));
-                    if (File.Exists(dest)) continue;
-                    File.Move(f, dest);
-                    moves[f] = dest;
+                    try
+                    {
+                        var m = System.Text.RegularExpressions.Regex.Match(
+                            Path.GetFileNameWithoutExtension(f), "_REC_(.+)$");
+                        if (!m.Success) continue;
+                        var songFolder = Path.Combine(root, SanitizeFolderName(m.Groups[1].Value));
+                        if (!Directory.Exists(songFolder)) continue;
+                        var recDir = Path.Combine(songFolder, "녹음");
+                        Directory.CreateDirectory(recDir);
+                        var dest = Path.Combine(recDir, Path.GetFileName(f));
+                        if (!File.Exists(dest)) File.Move(f, dest);
+                    }
+                    catch { }
                 }
                 if (Directory.GetFileSystemEntries(rootRec).Length == 0)
                     Directory.Delete(rootRec);
             }
+        }
+        catch { }
 
-            // 3) 저장된 플레이리스트 경로를 새 위치로 갱신
-            if (moves.Count > 0)
+        // 3) 재생목록(설정 + 저장된 목록 파일)에서 위치를 잃은 경로를 새 곡 폴더 위치로 복구
+        //    이동 기록에 의존하지 않으므로 이전 버전에서 이미 옮겨진 파일도 되찾는다
+        try
+        {
+            if (RelocateMissing(_settings.Playlist)) _settings.Save();
+        }
+        catch { }
+        try
+        {
+            if (Directory.Exists(PlaylistsDir))
             {
-                for (int i = 0; i < _settings.Playlist.Count; i++)
-                    if (moves.TryGetValue(_settings.Playlist[i], out var np))
-                        _settings.Playlist[i] = np;
-                _settings.Save();
+                foreach (var plFile in Directory.GetFiles(PlaylistsDir, "*.json"))
+                {
+                    try
+                    {
+                        var tracks = JsonSerializer.Deserialize<List<string>>(File.ReadAllText(plFile));
+                        if (tracks != null && RelocateMissing(tracks))
+                            File.WriteAllText(plFile, JsonSerializer.Serialize(tracks,
+                                new JsonSerializerOptions { WriteIndented = true }));
+                    }
+                    catch { }
+                }
             }
         }
         catch { }
+    }
+
+    /// <summary>존재하지 않는 Downloads 경로를 곡 폴더 규칙 위치에서 찾아 바꾼다. 바뀐 게 있으면 true</summary>
+    private bool RelocateMissing(List<string> paths)
+    {
+        string root = DownloadsDir;
+        bool changed = false;
+        for (int i = 0; i < paths.Count; i++)
+        {
+            var p = paths[i];
+            if (p.StartsWith("content://") || p.StartsWith("http") || File.Exists(p)) continue;
+            if (!p.StartsWith(root, StringComparison.OrdinalIgnoreCase)) continue;
+            var file = Path.GetFileName(p);
+            var name = Path.GetFileNameWithoutExtension(p);
+            string? found = null;
+            var songDir = Path.Combine(root, SanitizeFolderName(name));
+            if (File.Exists(Path.Combine(songDir, file))) found = Path.Combine(songDir, file);
+            else
+            {
+                var m = System.Text.RegularExpressions.Regex.Match(name, "_REC_(.+)$");
+                if (m.Success)
+                {
+                    var rec = Path.Combine(root, SanitizeFolderName(m.Groups[1].Value), "녹음", file);
+                    if (File.Exists(rec)) found = rec;
+                }
+            }
+            if (found != null)
+            {
+                paths[i] = found;
+                changed = true;
+            }
+        }
+        return changed;
     }
 
     // 곡 폴더 공유 가사 경로 (원본/변조본/녹음이 하나의 가사.txt 공유). 대상이 아니면 null
@@ -1084,9 +1194,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (LyricsEditMode && !_suppressLyricsDirty) _lyricsDirty = true;
     }
 
+    private string? _lyricsTrackPath; // 지금 화면 가사를 불러온 곡 (저장은 반드시 이 곡으로)
+
     private void LoadLyrics(string filePath)
     {
         _suppressLyricsDirty = true;
+        _lyricsTrackPath = filePath;
         try
         {
             // 곡 폴더 공유 가사 우선 (원본/변조본/녹음이 함께 사용)
@@ -1120,10 +1233,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public void SaveCurrentLyrics()
     {
         if (!_lyricsDirty) return;
-        if (CurrentIndex < 0 || CurrentIndex >= Playlist.Count) return;
+        var trackPath = _lyricsTrackPath;
+        if (string.IsNullOrEmpty(trackPath)) return;
         try
         {
-            var trackPath = Playlist[CurrentIndex].FilePath;
             var target = GetSharedLyricsPath(trackPath) ?? LyricsFilePath(trackPath);
             File.WriteAllText(target, LyricsText);
             _lyricsDirty = false;
@@ -1224,6 +1337,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         YoutubeProgress = 0;
         YoutubeStatusText = "영상 정보 가져오는 중...";
         DownloadYoutubeCommand.NotifyCanExecuteChanged();
+        bool serviceAcquired = false;
 
         try
         {
@@ -1235,14 +1349,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
 #if ANDROID
             // 화면이 꺼져도 다운로드가 얼지 않도록 포그라운드 서비스로 보호
-            Android.App.Application.Context.StartForegroundService(
-                new Android.Content.Intent(Android.App.Application.Context,
-                    typeof(ExtractionForegroundService)));
+            ForegroundJobs.AcquireWork();
+            serviceAcquired = true;
             // yt-dlp (PC와 동일 파이프라인) — 곡별 폴더 Downloads/{title}/{title}.{ext}
             string root = DownloadsDir;
             Directory.CreateDirectory(root);
-            var before = new HashSet<string>(
-                Directory.GetFiles(root, "*", SearchOption.AllDirectories).Where(IsAudioFile));
+            var startedAt = DateTime.Now.AddSeconds(-2);
             string template = Path.Combine(root, "%(title)s", "%(title)s.%(ext)s");
 
             using var dl = new Platforms.Android.YtDlpDownloader();
@@ -1253,9 +1365,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 YoutubeProgress = p;
                 YoutubeStatusText = $"다운로드 중... {p}%";
             });
+            List<string> newFiles;
             try
             {
-                await dl.DownloadAsync(url, template, "m4a", prog);
+                newFiles = await dl.DownloadAsync(url, template, "m4a", prog);
             }
             catch (Exception)
             {
@@ -1263,12 +1376,23 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 YoutubeStatusText = "yt-dlp 업데이트 중...";
                 await dl.UpdateAsync();
                 YoutubeStatusText = "다시 시도 중...";
-                await dl.DownloadAsync(url, template, "m4a", prog);
+                newFiles = await dl.DownloadAsync(url, template, "m4a", prog);
             }
 
-            var newFiles = Directory.GetFiles(root, "*", SearchOption.AllDirectories)
-                .Where(f => IsAudioFile(f) && !before.Contains(f))
-                .ToList();
+            // yt-dlp가 경로를 못 알려준 경우의 폴백: 곡 폴더(1단계)에서 이번에 생긴 오디오 중 최신 1개
+            // (녹음/반주/내보내기 파일은 제외 — 그 사이 생긴 다른 파일을 다운로드로 오인하지 않게)
+            if (newFiles.Count == 0)
+            {
+                newFiles = await Task.Run(() => Directory.GetDirectories(root)
+                    .SelectMany(d => Directory.GetFiles(d))
+                    .Where(f => IsAudioFile(f) && File.GetLastWriteTime(f) >= startedAt
+                                && !Path.GetFileNameWithoutExtension(f).Contains("_REC_")
+                                && !System.Text.RegularExpressions.Regex.IsMatch(
+                                       Path.GetFileNameWithoutExtension(f), @"_(HQ|P[+-]?\d+|T\d+|반주|Inst)($|_)"))
+                    .OrderByDescending(File.GetLastWriteTime)
+                    .Take(1)
+                    .ToList());
+            }
             if (newFiles.Count == 0) throw new Exception("다운로드된 파일을 찾을 수 없습니다.");
 
             dlFinished = true;
@@ -1281,11 +1405,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
             }
             YoutubeUrl = "";
 
-            // PC와 동일하게: 받은 곡을 바로 재생 (리스트 하단에 있어도 바로 확인 가능)
+            // PC와 동일하게: 받은 곡을 바로 재생 — 단, 녹음 중이면 끼어들지 않음
             int newIdx = -1;
             for (int i = 0; i < Playlist.Count; i++)
                 if (Playlist[i].FilePath == newFiles[0]) { newIdx = i; break; }
-            if (newIdx >= 0) PlayTrack(newIdx);
+            if (newIdx >= 0 && !IsRecording && !IsRecordSaving) PlayTrack(newIdx);
 #else
             await Task.CompletedTask;
             throw new Exception("Android 전용");
@@ -1300,9 +1424,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             IsDownloading = false;
             DownloadYoutubeCommand.NotifyCanExecuteChanged();
 #if ANDROID
-            Android.App.Application.Context.StopService(
-                new Android.Content.Intent(Android.App.Application.Context,
-                    typeof(ExtractionForegroundService)));
+            if (serviceAcquired) ForegroundJobs.ReleaseWork();
 #endif
         }
     }
@@ -1536,9 +1658,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         ExtractionStatusText = "준비 중...";
         ExtractAccompanimentCommand.NotifyCanExecuteChanged();
 #if ANDROID
-        Android.App.Application.Context.StartForegroundService(
-            new Android.Content.Intent(Android.App.Application.Context,
-                typeof(ExtractionForegroundService)));
+        ForegroundJobs.AcquireWork();
 #endif
 
         _extractCts = new CancellationTokenSource();
@@ -1584,8 +1704,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
             // 5. WAV → MP3 via existing pipeline
             ExtractionStatusText = "MP3 변환 중...";
             string mp3Name = Path.GetFileNameWithoutExtension(item.FilePath) + "_반주.mp3";
-            string mp3Path = Path.Combine(DownloadsDir, mp3Name);
-            Directory.CreateDirectory(DownloadsDir);
+            // 원곡과 같은 곡 폴더에 저장 (가사 공유·파생 파일 규칙). 곡 폴더가 아니면 Downloads 최상위
+            string mp3Dir = (!item.FilePath.StartsWith("content://") && Path.GetDirectoryName(item.FilePath) is string srcDir
+                             && srcDir.StartsWith(DownloadsDir, StringComparison.OrdinalIgnoreCase))
+                ? srcDir : DownloadsDir;
+            string mp3Path = Path.Combine(mp3Dir, mp3Name);
+            Directory.CreateDirectory(mp3Dir);
 
             var mp3Prog = new Progress<int>(p =>
             {
@@ -1623,9 +1747,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             IsExtracting = false;
             ExtractAccompanimentCommand.NotifyCanExecuteChanged();
 #if ANDROID
-            Android.App.Application.Context.StopService(
-                new Android.Content.Intent(Android.App.Application.Context,
-                    typeof(ExtractionForegroundService)));
+            ForegroundJobs.ReleaseWork();
 #endif
         }
     }

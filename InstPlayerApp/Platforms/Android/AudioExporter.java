@@ -367,6 +367,9 @@ public class AudioExporter {
                         ? f.getInteger(MediaFormat.KEY_PCM_ENCODING)
                         : android.media.AudioFormat.ENCODING_PCM_16BIT;
                 isFloat = (enc == android.media.AudioFormat.ENCODING_PCM_FLOAT);
+                // HE-AAC 등은 디코더 출력 샘플레이트/채널이 컨테이너 값과 다르다 — 헤더는 출력 기준
+                if (f.containsKey(MediaFormat.KEY_SAMPLE_RATE)) sampleRate = f.getInteger(MediaFormat.KEY_SAMPLE_RATE);
+                if (f.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) channels = f.getInteger(MediaFormat.KEY_CHANNEL_COUNT);
             } else if (idx >= 0) {
                 ByteBuffer out = decoder.getOutputBuffer(idx);
                 if (out != null && info.size > 0) {

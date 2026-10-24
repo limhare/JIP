@@ -18,11 +18,27 @@ public partial class MainPage : ContentPage
         BindingContext = _vm = vm;
     }
 
+    private bool _notifPermissionAsked;
+
+    // Android 13+: 알림 권한이 없으면 재생/녹음/작업 알림이 보이지 않는다 (동작 자체는 계속됨)
+    private async Task RequestNotificationPermissionOnce()
+    {
+        if (_notifPermissionAsked) return;
+        _notifPermissionAsked = true;
+        try
+        {
+            if (DeviceInfo.Platform == DevicePlatform.Android && DeviceInfo.Version.Major >= 13)
+                await Permissions.RequestAsync<Permissions.PostNotifications>();
+        }
+        catch { }
+    }
+
     protected override async void OnAppearing()
     {
         base.OnAppearing();
         _vm.StartTimer(Dispatcher);
         _vm.SyncVolumeFromSystem();
+        await RequestNotificationPermissionOnce();
 
         // 앱이 실행 중일 때 공유 이벤트 수신 (OnNewIntent → ShareReceiver.NotifyUrl)
         // 중복 등록 방지: 먼저 제거 후 등록

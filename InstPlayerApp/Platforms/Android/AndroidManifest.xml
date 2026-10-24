@@ -5,10 +5,11 @@
 		<service android:name="com.instplayer.app.ExtractionForegroundService"
 		         android:foregroundServiceType="dataSync"
 		         android:exported="false" />
-		<service android:name="com.instplayer.app.PlaybackForegroundService"
-		         android:foregroundServiceType="mediaPlayback"
+		<!-- 녹음 중 화면이 꺼져도 마이크가 계속 들어오도록 microphone 타입 필요 -->
+		<service android:name="com.instplayer.app.RecordingForegroundService"
+		         android:foregroundServiceType="microphone"
 		         android:exported="false" />
-		<!-- Android Auto 미디어 브라우저 -->
+		<!-- 미디어 세션(잠금화면·블루투스·차량 버튼·Android Auto) + 재생 중 포그라운드 보호 -->
 		<service android:name="com.instplayer.app.JipMediaLibraryService"
 		         android:foregroundServiceType="mediaPlayback"
 		         android:exported="true">
@@ -37,6 +38,8 @@
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+	<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 	<uses-permission android:name="android.permission.WAKE_LOCK" />
 	<uses-permission android:name="android.permission.RECORD_AUDIO" />
 </manifest>

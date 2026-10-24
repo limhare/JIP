@@ -44,7 +44,7 @@ internal class YtDlpDownloader : IDisposable
         JNIEnv.DeleteLocalRef(local);
 
         _startDownloadId = JNIEnv.GetMethodID(_classRef, "startDownload",
-            "(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
+            "(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
         _startUpdateId = JNIEnv.GetMethodID(_classRef, "startUpdate", "(Landroid/content/Context;)V");
         _isDoneId      = JNIEnv.GetMethodID(_classRef, "isDone",      "()Z");
         _getProgressId = JNIEnv.GetMethodID(_classRef, "getProgress", "()I");
@@ -52,17 +52,33 @@ internal class YtDlpDownloader : IDisposable
         _getErrorId    = JNIEnv.GetMethodID(_classRef, "getError",    "()Ljava/lang/String;");
     }
 
-    public async Task DownloadAsync(string url, string outputTemplate, string audioFormat,
+    /// <returns>yt-dlp가 기록한 최종 저장 파일 경로들 (기록이 없으면 빈 목록)</returns>
+    public async Task<List<string>> DownloadAsync(string url, string outputTemplate, string audioFormat,
                                     IProgress<int>? progress = null, CancellationToken ct = default)
     {
         EnsureInit();
-        using var jUrl = new Java.Lang.String(url);
-        using var jTpl = new Java.Lang.String(outputTemplate);
-        using var jFmt = new Java.Lang.String(audioFormat);
-        JNIEnv.CallVoidMethod(_objRef, _startDownloadId,
-            new JValue(global::Android.App.Application.Context),
-            new JValue(jUrl), new JValue(jTpl), new JValue(jFmt));
-        await PollAsync(progress, ct);
+        string pathFile = Path.Combine(FileSystem.CacheDirectory, $"ytdlp_path_{Guid.NewGuid():N}.txt");
+        try
+        {
+            using var jUrl = new Java.Lang.String(url);
+            using var jTpl = new Java.Lang.String(outputTemplate);
+            using var jFmt = new Java.Lang.String(audioFormat);
+            using var jPath = new Java.Lang.String(pathFile);
+            JNIEnv.CallVoidMethod(_objRef, _startDownloadId,
+                new JValue(global::Android.App.Application.Context),
+                new JValue(jUrl), new JValue(jTpl), new JValue(jFmt), new JValue(jPath));
+            await PollAsync(progress, ct);
+            if (!File.Exists(pathFile)) return [];
+            return File.ReadAllLines(pathFile)
+                .Select(l => l.Trim())
+                .Where(l => l.Length > 0 && File.Exists(l))
+                .Distinct()
+                .ToList();
+        }
+        finally
+        {
+            try { File.Delete(pathFile); } catch { }
+        }
     }
 
     public async Task UpdateAsync(CancellationToken ct = default)

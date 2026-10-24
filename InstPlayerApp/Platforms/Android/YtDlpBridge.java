@@ -17,6 +17,10 @@ public class YtDlpBridge {
     private static volatile boolean initialized = false;
     private static volatile String initError = null;
 
+    // yt-dlp 실행과 자체 업데이트가 겹치지 않도록 (업데이트가 실행 중인 바이너리를 교체하지 않게)
+    private static final Object EXEC_LOCK = new Object();
+
+    private volatile int job = 0; // 이전 작업 스레드가 새 작업 상태를 덮어쓰지 않도록
     private volatile int progress = 0;
     private volatile boolean done = false;
     private volatile String result = null;
@@ -50,9 +54,14 @@ public class YtDlpBridge {
         }
     }
 
-    /** 다운로드 시작 — outputTemplate 예: {dir}/%(title)s/%(title)s.%(ext)s */
+    /**
+     * 다운로드 시작 — outputTemplate 예: {dir}/%(title)s/%(title)s.%(ext)s
+     * pathFile: 최종 저장 경로를 yt-dlp가 기록할 파일 (--print는 quiet를 강제해 진행률이 사라지므로 print-to-file 사용)
+     */
     public void startDownload(final Context ctx, final String url,
-                              final String outputTemplate, final String audioFormat) {
+                              final String outputTemplate, final String audioFormat,
+                              final String pathFile) {
+        final int myJob = ++job;
         progress = 0; done = false; result = null; error = null;
         new Thread(new Runnable() {
             @Override public void run() {
@@ -66,12 +75,18 @@ public class YtDlpBridge {
                     req.addOption("--no-playlist");
                     req.addOption("--no-mtime");
                     req.addOption("-o", outputTemplate);
-                    YoutubeDL.getInstance().execute(req, null, new BoundProgressFn());
+                    if (pathFile != null && !pathFile.isEmpty())
+                        req.addCommands(java.util.Arrays.asList("--print-to-file", "after_move:filepath", pathFile));
+                    synchronized (EXEC_LOCK) {
+                        YoutubeDL.getInstance().execute(req, null, new BoundProgressFn(myJob));
+                    }
+                    if (myJob != job) return;
                     result = "ok";
                     progress = 100;
                     done = true;
                 } catch (Throwable t) {
                     Log.e(TAG, "yt-dlp download failed", t);
+                    if (myJob != job) return;
                     error = t.getMessage() != null ? t.getMessage() : "yt-dlp error";
                     done = true;
                 }
@@ -81,17 +96,22 @@ public class YtDlpBridge {
 
     /** yt-dlp 자체 업데이트 (다운로드 실패 시 자동 복구용) */
     public void startUpdate(final Context ctx) {
+        final int myJob = ++job;
         progress = 0; done = false; result = null; error = null;
         new Thread(new Runnable() {
             @Override public void run() {
                 try {
                     if (!ensureInit(ctx))
                         throw new Exception("yt-dlp init failed: " + initError);
-                    YoutubeDL.getInstance().updateYoutubeDL(ctx, YoutubeDL.UpdateChannel._STABLE);
+                    synchronized (EXEC_LOCK) {
+                        YoutubeDL.getInstance().updateYoutubeDL(ctx, YoutubeDL.UpdateChannel._STABLE);
+                    }
+                    if (myJob != job) return;
                     result = "ok";
                     done = true;
                 } catch (Throwable t) {
                     Log.e(TAG, "yt-dlp update failed", t);
+                    if (myJob != job) return;
                     error = t.getMessage() != null ? t.getMessage() : "update error";
                     done = true;
                 }
@@ -100,9 +120,11 @@ public class YtDlpBridge {
     }
 
     private class BoundProgressFn implements kotlin.jvm.functions.Function3<Float, Long, String, kotlin.Unit> {
+        private final int myJob;
+        BoundProgressFn(int myJob) { this.myJob = myJob; }
         @Override
         public kotlin.Unit invoke(Float p, Long etaSec, String line) {
-            if (p != null && p >= 0f) progress = (int) Math.min(100f, p);
+            if (myJob == job && p != null && p >= 0f) progress = (int) Math.min(100f, p);
             return kotlin.Unit.INSTANCE;
         }
     }

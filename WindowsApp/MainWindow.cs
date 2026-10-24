@@ -265,6 +265,23 @@ public partial class MainWindow : Window
 
 	private bool playingOriginalKeyOverride;
 
+	private bool isMixing;
+
+	private string lyricsEditOriginal = "";
+
+	private const string RecordingFolderName = "녹음";
+
+	private static readonly string[] AudioExtensions = new string[7] { ".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac", ".opus" };
+
+	private static bool IsRecordingFolderName(string? name)
+	{
+		if (!(name == RecordingFolderName))
+		{
+			return string.Equals(name, "Recordings", StringComparison.OrdinalIgnoreCase);
+		}
+		return true;
+	}
+
 	private string S(string kor, string eng)
 	{
 		if (!isKorean)
@@ -477,7 +494,7 @@ public partial class MainWindow : Window
 		AbSetBBtn.Content = S("B 지점", "Set B");
 		AbClearBtn.Content = S("해제", "Clear");
 		ExportBtn.Content = S("내보내기", "Export");
-		if (!isRecording)
+		if (!isRecording && !isMixing)
 		{
 			RecordBtn.Content = S("● 녹음", "● Rec");
 			LoopbackBtn.Content = (loopbackMode ? S("반주+마이크", "Inst+Mic") : S("마이크", "Mic"));
@@ -805,6 +822,8 @@ public partial class MainWindow : Window
 		string sourcePath = playlist[currentIndex];
 		float pitch = (float)PitchSlider.Value;
 		float tempo = (float)TempoSlider.Value;
+		StopPlaybackIfFileOpen(outputPath);
+		string partPath = outputPath + ".part";
 		ExportBtn.IsEnabled = false;
 		ExportBtn.Content = "저장 중...";
 		try
@@ -822,7 +841,7 @@ public partial class MainWindow : Window
 					{
 						WaveFileWriter.CreateWaveFile(text, soundTouchWaveStream);
 						using AudioFileReader audioFileReader = new AudioFileReader(text);
-						using LameMP3FileWriter destination = new LameMP3FileWriter(outputPath, audioFileReader.WaveFormat, 192);
+						using LameMP3FileWriter destination = new LameMP3FileWriter(partPath, audioFileReader.WaveFormat, 192);
 						audioFileReader.CopyTo(destination);
 						return;
 					}
@@ -834,8 +853,10 @@ public partial class MainWindow : Window
 						}
 					}
 				}
-				WaveFileWriter.CreateWaveFile(outputPath, soundTouchWaveStream);
+				WaveFileWriter.CreateWaveFile(partPath, soundTouchWaveStream);
 			});
+			StopPlaybackIfFileOpen(outputPath);
+			System.IO.File.Move(partPath, outputPath, overwrite: true);
 			MessageBox.Show("내보내기 완료!");
 		}
 		catch (Exception ex)
@@ -844,6 +865,7 @@ public partial class MainWindow : Window
 		}
 		finally
 		{
+			DeleteFileQuietly(partPath);
 			ExportBtn.IsEnabled = true;
 			ExportBtn.Content = "내보내기";
 		}
@@ -911,10 +933,15 @@ public partial class MainWindow : Window
 	private void DownloadCleanBtn_Click(object sender, RoutedEventArgs e)
 	{
 		downloadedFiles.RemoveAll(f => !System.IO.File.Exists(f));
-		List<string> candidates = downloadedFiles.Where(f => !playlist.Contains(f)).ToList();
+		// A download whose song folder still has something in the playlist (e.g. its _Inst/HQ versions or recordings) is the source of that file and must stay.
+		HashSet<string> songDirsInUse = new HashSet<string>(from p in playlist
+			select GetSongDirectory(p) into d
+			where d != null
+			select d, StringComparer.OrdinalIgnoreCase);
+		List<string> candidates = downloadedFiles.Where(f => !playlist.Contains(f) && !songDirsInUse.Contains(GetSongDirectory(f) ?? "")).ToList();
 		if (candidates.Count == 0)
 		{
-			MessageBox.Show(S("정리할 다운로드 파일이 없습니다.\n(재생목록에 없는 다운로드 파일만 정리됩니다.)", "No downloaded files to clean up.\n(Only downloads not in the playlist are removed.)"), S("다운로드 정리", "Clean Downloads"));
+			MessageBox.Show(S("정리할 다운로드 파일이 없습니다.\n(재생목록에 없고, 같은 곡 폴더의 파일도 재생목록에 없는 다운로드만 정리됩니다.)", "No downloaded files to clean up.\n(Only downloads that are not in the playlist, and whose song folder has nothing in the playlist, are removed.)"), S("다운로드 정리", "Clean Downloads"));
 			return;
 		}
 		long totalBytes = 0L;
@@ -984,6 +1011,7 @@ public partial class MainWindow : Window
 		string sourcePath = playlist[currentIndex];
 		float pitch = (float)PitchSlider.Value;
 		float tempo = (float)TempoSlider.Value;
+		StopPlaybackIfFileOpen(outputPath);
 		ExportHqBtn.IsEnabled = false;
 		ExportBtn.IsEnabled = false;
 		Progress<string> progress = new Progress<string>(delegate(string txt)
@@ -1031,6 +1059,8 @@ public partial class MainWindow : Window
 	{
 		string tempIn = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString() + ".wav");
 		string tempOut = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString() + ".wav");
+		// Encode next to the target under a non-audio extension, then rename, so a half-written file never carries the final name (FindPrerenderedPitchFile would pick it up).
+		string partPath = outputPath + ".part";
 		try
 		{
 			progress?.Report(S("디코딩...", "Decoding..."));
@@ -1073,16 +1103,18 @@ public partial class MainWindow : Window
 			{
 				progress?.Report(S("MP3 인코딩...", "Encoding..."));
 				using AudioFileReader outReader = new AudioFileReader(tempOut);
-				using LameMP3FileWriter writer = new LameMP3FileWriter(outputPath, outReader.WaveFormat, 320);
+				using LameMP3FileWriter writer = new LameMP3FileWriter(partPath, outReader.WaveFormat, 320);
 				outReader.CopyTo(writer);
 			}
 			else
 			{
-				System.IO.File.Copy(tempOut, outputPath, overwrite: true);
+				System.IO.File.Copy(tempOut, partPath, overwrite: true);
 			}
+			System.IO.File.Move(partPath, outputPath, overwrite: true);
 		}
 		finally
 		{
+			DeleteFileQuietly(partPath);
 			try
 			{
 				if (System.IO.File.Exists(tempIn))
@@ -1151,22 +1183,37 @@ public partial class MainWindow : Window
 		try
 		{
 			await Task.Run(() => RunDemucs(demucsExe, sourcePath, outputPath, progress));
-			int idx = playlist.IndexOf(sourcePath);
-			if (idx >= 0)
+			bool sourceIsCurrent = currentIndex >= 0 && currentIndex < playlist.Count && playlist[currentIndex] == sourcePath;
+			int instIdx = playlist.IndexOf(outputPath);
+			if (instIdx < 0)
 			{
-				playlist[idx] = outputPath;
-				PlaylistBox.Items[idx] = System.IO.Path.GetFileName(outputPath);
-				UpdatePlaylistHighlight();
-				if (currentIndex == idx)
+				int idx = playlist.IndexOf(sourcePath);
+				if (idx >= 0)
 				{
-					PlayTrack(idx);
+					instIdx = idx + 1;
+					playlist.Insert(instIdx, outputPath);
+					PlaylistBox.Items.Insert(instIdx, System.IO.Path.GetFileName(outputPath));
+					if (currentIndex >= instIdx)
+					{
+						currentIndex++;
+					}
 				}
+				else
+				{
+					AddToPlaylist(outputPath);
+					instIdx = playlist.Count - 1;
+				}
+			}
+			if (sourceIsCurrent && !isRecording)
+			{
+				PlayTrack(instIdx);
 			}
 			else
 			{
-				AddToPlaylist(outputPath);
+				PlaylistBox.SelectedIndex = instIdx;
+				UpdatePlaylistHighlight();
 			}
-			MessageBox.Show(S("AI 반주 추출 완료!\n재생목록의 원본이 반주 파일로 대체되었습니다.", "AI instrumental complete!\nThe original in the playlist was replaced with the instrumental."));
+			MessageBox.Show(S("AI 반주 추출 완료!\n반주 파일을 재생목록의 원본 바로 아래에 추가했습니다.", "AI instrumental complete!\nThe instrumental was added right below the original in the playlist."));
 		}
 		catch (Exception ex)
 		{
@@ -1185,6 +1232,7 @@ public partial class MainWindow : Window
 		string tempDir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "jip_demucs_" + Guid.NewGuid().ToString("N"));
 		Directory.CreateDirectory(tempDir);
 		string tempWav = System.IO.Path.Combine(tempDir, "input.wav");
+		string partPath = outputPath + ".part";
 		try
 		{
 			progress?.Report(S("디코딩...", "Decoding..."));
@@ -1241,12 +1289,16 @@ public partial class MainWindow : Window
 				throw new Exception(S("결과 파일(no_vocals.wav)을 찾을 수 없습니다.", "Result file (no_vocals.wav) not found."));
 			}
 			progress?.Report(S("MP3 인코딩...", "Encoding..."));
-			using AudioFileReader outReader = new AudioFileReader(stemWav);
-			using LameMP3FileWriter writer = new LameMP3FileWriter(outputPath, outReader.WaveFormat, 320);
-			outReader.CopyTo(writer);
+			using (AudioFileReader outReader = new AudioFileReader(stemWav))
+			{
+				using LameMP3FileWriter writer = new LameMP3FileWriter(partPath, outReader.WaveFormat, 320);
+				outReader.CopyTo(writer);
+			}
+			System.IO.File.Move(partPath, outputPath, overwrite: true);
 		}
 		finally
 		{
+			DeleteFileQuietly(partPath);
 			try
 			{
 				Directory.Delete(tempDir, recursive: true);
@@ -1891,19 +1943,45 @@ public partial class MainWindow : Window
 
 	private void StartRecording()
 	{
-		string text;
-		if (currentIndex >= 0 && currentIndex < playlist.Count && Directory.Exists(System.IO.Path.GetDirectoryName(playlist[currentIndex]) ?? ""))
+		if (isMixing)
 		{
-			text = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(playlist[currentIndex]), S("녹음", "Recordings"));
+			return;
 		}
-		else
+		string text = null;
+		string songDir = ((currentIndex >= 0 && currentIndex < playlist.Count) ? System.IO.Path.GetDirectoryName(playlist[currentIndex]) : null);
+		if (!string.IsNullOrEmpty(songDir) && Directory.Exists(songDir))
+		{
+			text = (IsRecordingFolderName(System.IO.Path.GetFileName(songDir)) ? songDir : System.IO.Path.Combine(songDir, RecordingFolderName));
+			try
+			{
+				Directory.CreateDirectory(text);
+			}
+			catch
+			{
+				text = null;
+			}
+		}
+		if (text == null)
 		{
 			string path = ((libraryFolders.Count > 0 && Directory.Exists(libraryFolders[0])) ? libraryFolders[0] : ((!string.IsNullOrEmpty(recordingBasePath)) ? recordingBasePath : Environment.GetFolderPath(Environment.SpecialFolder.MyMusic)));
 			string path2 = DateTime.Now.ToString("yyMMdd");
 			text = System.IO.Path.Combine(path, path2);
+			try
+			{
+				Directory.CreateDirectory(text);
+			}
+			catch (Exception ex2)
+			{
+				MessageBox.Show(S("녹음 폴더를 만들 수 없습니다:\n" + text + "\n" + ex2.Message, "Cannot create the recording folder:\n" + text + "\n" + ex2.Message));
+				return;
+			}
 		}
-		Directory.CreateDirectory(text);
 		string text2 = ((currentIndex >= 0 && currentIndex < playlist.Count) ? System.IO.Path.GetFileNameWithoutExtension(playlist[currentIndex]) : "untitled");
+		text2 = System.Text.RegularExpressions.Regex.Replace(text2, "^(\\d{6}_\\d{6}_REC_)+", "");
+		if (string.IsNullOrEmpty(text2))
+		{
+			text2 = "untitled";
+		}
 		char[] invalidFileNameChars = System.IO.Path.GetInvalidFileNameChars();
 		foreach (char oldChar in invalidFileNameChars)
 		{
@@ -1955,7 +2033,8 @@ public partial class MainWindow : Window
 			WaveFormat = new WaveFormat(44100, 2),
 			BufferMilliseconds = 30
 		};
-		waveWriter = new WaveFileWriter(pendingSavePath, waveIn.WaveFormat);
+		string savePath = pendingSavePath;
+		waveWriter = new WaveFileWriter(savePath, waveIn.WaveFormat);
 		waveIn.DataAvailable += delegate(object? s, WaveInEventArgs e)
 		{
 			waveWriter?.Write(e.Buffer, 0, e.BytesRecorded);
@@ -1969,11 +2048,11 @@ public partial class MainWindow : Window
 			waveIn?.Dispose();
 			waveIn = null;
 			base.Dispatcher.Invoke(OnRecordingFinished);
-			MessageBox.Show(S("녹음 저장 완료:\n" + pendingSavePath, "Recording saved:\n" + pendingSavePath), S("녹음 완료", "Done"));
+			MessageBox.Show(S("녹음 저장 완료:\n" + savePath, "Recording saved:\n" + savePath), S("녹음 완료", "Done"));
 			base.Dispatcher.Invoke(delegate
 			{
 				LibraryRefreshBtn_Click(this, new RoutedEventArgs());
-				AddRecordingToPlaylist(pendingSavePath);
+				AddRecordingToPlaylist(savePath);
 			});
 		};
 		waveIn.StartRecording();
@@ -2053,17 +2132,24 @@ public partial class MainWindow : Window
 		{
 			return;
 		}
+		string mrPath = tempMrPath;
+		string micPath = tempMicPath;
+		string savePath = pendingSavePath;
+		long mrTick = mrFirstTick;
+		long micTick = micFirstTick;
 		base.Dispatcher.Invoke(delegate
 		{
 			OnRecordingFinished();
+			isMixing = true;
+			RecordBtn.IsEnabled = false;
 			RecordBtn.Content = S("혼합 중...", "Mixing...");
 		});
 		Task.Run(async delegate
 		{
 			try
 			{
-				await MixAndSaveAsync(tempMrPath, tempMicPath, pendingSavePath, mrFirstTick, micFirstTick);
-				MessageBox.Show(S("녹음 저장 완료:\n" + pendingSavePath, "Recording saved:\n" + pendingSavePath), S("녹음 완료", "Done"));
+				await MixAndSaveAsync(mrPath, micPath, savePath, mrTick, micTick);
+				MessageBox.Show(S("녹음 저장 완료:\n" + savePath, "Recording saved:\n" + savePath), S("녹음 완료", "Done"));
 			}
 			catch (Exception ex)
 			{
@@ -2071,19 +2157,15 @@ public partial class MainWindow : Window
 			}
 			finally
 			{
-				if (System.IO.File.Exists(tempMrPath))
-				{
-					System.IO.File.Delete(tempMrPath);
-				}
-				if (System.IO.File.Exists(tempMicPath))
-				{
-					System.IO.File.Delete(tempMicPath);
-				}
+				DeleteFileQuietly(mrPath);
+				DeleteFileQuietly(micPath);
 				base.Dispatcher.Invoke(delegate
 				{
+					isMixing = false;
+					RecordBtn.IsEnabled = true;
 					RecordBtn.Content = S("● 녹음", "● Rec");
 					LibraryRefreshBtn_Click(this, new RoutedEventArgs());
-					AddRecordingToPlaylist(pendingSavePath);
+					AddRecordingToPlaylist(savePath);
 				});
 			}
 		});
@@ -2635,6 +2717,7 @@ public partial class MainWindow : Window
 					CurrentTimeText.Text = "0:00";
 					TotalTimeText.Text = "0:00";
 					currentIndex = -1;
+					AutoSavePendingLyricsEdit();
 					currentLyricsPath = "";
 					UpdateLyricsDisplay();
 				}
@@ -2649,13 +2732,18 @@ public partial class MainWindow : Window
 		UpdatePlaylistHighlight();
 	}
 
-	private void PlayTrack(int index)
+	private void PlayTrack(int index, double startSeconds = 0.0, bool startPaused = false)
 	{
 		if (index < 0 || index >= playlist.Count)
 		{
 			return;
 		}
 		StopPlayback();
+		bool keepLyricsEdit = lyricsEditMode && string.Equals(currentLyricsPath, playlist[index], StringComparison.OrdinalIgnoreCase);
+		if (!keepLyricsEdit)
+		{
+			AutoSavePendingLyricsEdit();
+		}
 		currentIndex = index;
 		abPointA = -1.0;
 		abPointB = -1.0;
@@ -2675,7 +2763,20 @@ public partial class MainWindow : Window
 		}
 		try
 		{
-			audioFileReader = new AudioFileReader(fileToPlay);
+			try
+			{
+				audioFileReader = new AudioFileReader(fileToPlay);
+			}
+			catch when (playingPrerendered)
+			{
+				fileToPlay = playlist[index];
+				playingPrerendered = false;
+				audioFileReader = new AudioFileReader(fileToPlay);
+			}
+			if (startSeconds > 0.0)
+			{
+				audioFileReader.CurrentTime = TimeSpan.FromSeconds(Math.Min(startSeconds, Math.Max(0.0, audioFileReader.TotalTime.TotalSeconds - 0.1)));
+			}
 			soundTouchStream = new SoundTouchWaveStream(audioFileReader);
 			soundTouchStream.PitchSemiTones = ((playingPrerendered || playingOriginalKeyOverride) ? 0f : (float)PitchSlider.Value);
 			soundTouchStream.TempoChange = (playingOriginalKeyOverride ? 0f : (float)TempoSlider.Value);
@@ -2702,17 +2803,28 @@ public partial class MainWindow : Window
 				};
 			}
 			outputDevice.Init(monitorBoost);
-			outputDevice.Play();
+			if (!startPaused)
+			{
+				outputDevice.Play();
+			}
 			bool sliderOffset = (int)Math.Round(PitchSlider.Value) != 0 || (int)Math.Round(TempoSlider.Value) != 0;
 			NowPlayingText.Text = System.IO.Path.GetFileName(fileToPlay) + (playingPrerendered ? S(" [변조본]", " [rendered]") : ((playingOriginalKeyOverride && sliderOffset) ? S(" [원키]", " [original key]") : ""));
-			PlayPauseButton.Content = "⏸";
+			PlayPauseButton.Content = (startPaused ? "▶" : "⏸");
 			ProgressSlider.Maximum = audioFileReader.TotalTime.TotalSeconds;
 			TotalTimeText.Text = FormatTime(audioFileReader.TotalTime);
+			ProgressSlider.Value = audioFileReader.CurrentTime.TotalSeconds;
+			CurrentTimeText.Text = FormatTime(audioFileReader.CurrentTime);
 			PlaylistBox.SelectedIndex = index;
-			progressTimer.Start();
+			if (!startPaused)
+			{
+				progressTimer.Start();
+			}
 			UpdatePlaylistHighlight();
 			currentLyricsPath = playlist[index];
-			UpdateLyricsDisplay();
+			if (!keepLyricsEdit)
+			{
+				UpdateLyricsDisplay();
+			}
 		}
 		catch (Exception ex)
 		{
@@ -2735,6 +2847,108 @@ public partial class MainWindow : Window
 		audioFileReader = null;
 	}
 
+	private void StopPlaybackIfFileOpen(string path)
+	{
+		if (audioFileReader == null)
+		{
+			return;
+		}
+		try
+		{
+			if (!string.Equals(System.IO.Path.GetFullPath(audioFileReader.FileName), System.IO.Path.GetFullPath(path), StringComparison.OrdinalIgnoreCase))
+			{
+				return;
+			}
+		}
+		catch
+		{
+			return;
+		}
+		StopPlayback();
+		PlayPauseButton.Content = "▶";
+		ProgressSlider.Value = 0.0;
+		CurrentTimeText.Text = "0:00";
+	}
+
+	private static void DeleteFileQuietly(string path)
+	{
+		try
+		{
+			if (System.IO.File.Exists(path))
+			{
+				System.IO.File.Delete(path);
+			}
+		}
+		catch
+		{
+		}
+	}
+
+	private static bool CanOpenForRead(string path)
+	{
+		try
+		{
+			using FileStream fileStream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+			return fileStream.Length > 0;
+		}
+		catch (IOException)
+		{
+			return false;
+		}
+		catch (UnauthorizedAccessException)
+		{
+			return false;
+		}
+	}
+
+	private static string? GetSongDirectory(string audioPath)
+	{
+		try
+		{
+			string dir = System.IO.Path.GetDirectoryName(audioPath);
+			if (dir != null && IsRecordingFolderName(System.IO.Path.GetFileName(dir)))
+			{
+				dir = System.IO.Path.GetDirectoryName(dir);
+			}
+			return dir;
+		}
+		catch
+		{
+			return null;
+		}
+	}
+
+	private static string GetSongBaseName(string path)
+	{
+		string name = System.IO.Path.GetFileNameWithoutExtension(path);
+		name = System.Text.RegularExpressions.Regex.Replace(name, "^(\\d{6}_\\d{6}_REC_)+", "");
+		return System.Text.RegularExpressions.Regex.Replace(name, "(_(HQ|Inst|P[+-]?\\d+|T\\d+))+$", "");
+	}
+
+	private bool IsSongFolder(string dir)
+	{
+		try
+		{
+			string root = (string.IsNullOrEmpty(musicRootPath) ? GetMusicRoot() : musicRootPath);
+			if (string.IsNullOrEmpty(root))
+			{
+				return false;
+			}
+			string parent = System.IO.Path.GetDirectoryName(dir.TrimEnd('\\', '/'));
+			if (parent == null || !string.Equals(parent.TrimEnd('\\', '/'), root.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase))
+			{
+				return false;
+			}
+			// Windows는 폴더명 끝의 점/공백을 지우므로 "제목...m4a"의 곡 폴더는 "제목"이 된다 — 양쪽 다 잘라서 비교
+			string folderName = System.IO.Path.GetFileName(dir.TrimEnd('\\', '/')).TrimEnd('.', ' ');
+			return Directory.EnumerateFiles(dir).Any(f => AudioExtensions.Contains(System.IO.Path.GetExtension(f).ToLowerInvariant()) && string.Equals(System.IO.Path.GetFileNameWithoutExtension(f).TrimEnd('.', ' '), folderName, StringComparison.OrdinalIgnoreCase));
+		}
+		catch
+		{
+			return false;
+		}
+	}
+
 	private void ApplyPitchTempo()
 	{
 		if (soundTouchStream == null)
@@ -2746,6 +2960,10 @@ public partial class MainWindow : Window
 			playingOriginalKeyOverride = false;
 			soundTouchStream.PitchSemiTones = (float)PitchSlider.Value;
 			soundTouchStream.TempoChange = (float)TempoSlider.Value;
+			if (currentIndex >= 0 && currentIndex < playlist.Count)
+			{
+				NowPlayingText.Text = System.IO.Path.GetFileName(playlist[currentIndex]);
+			}
 			return;
 		}
 		int pitchNow = (int)Math.Round(PitchSlider.Value);
@@ -2790,20 +3008,10 @@ public partial class MainWindow : Window
 		bool wasPaused = outputDevice != null && outputDevice.PlaybackState != PlaybackState.Playing;
 		double savedA = abPointA;
 		double savedB = abPointB;
-		PlayTrack(currentIndex);
+		PlayTrack(currentIndex, pos, wasPaused);
 		abPointA = savedA;
 		abPointB = savedB;
 		UpdateAbInfo();
-		if (audioFileReader != null)
-		{
-			audioFileReader.CurrentTime = TimeSpan.FromSeconds(Math.Min(pos, Math.Max(0.0, audioFileReader.TotalTime.TotalSeconds - 0.1)));
-		}
-		if (wasPaused && outputDevice != null)
-		{
-			outputDevice.Pause();
-			PlayPauseButton.Content = "▶";
-			progressTimer.Stop();
-		}
 	}
 
 	private static bool IsRecordingFile(string path)
@@ -2812,8 +3020,7 @@ public partial class MainWindow : Window
 		{
 			return true;
 		}
-		string parent = System.IO.Path.GetFileName(System.IO.Path.GetDirectoryName(path) ?? "");
-		return parent == "녹음" || string.Equals(parent, "Recordings", StringComparison.OrdinalIgnoreCase);
+		return IsRecordingFolderName(System.IO.Path.GetFileName(System.IO.Path.GetDirectoryName(path) ?? ""));
 	}
 
 	private void PlaylistBox_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
@@ -2862,15 +3069,26 @@ public partial class MainWindow : Window
 		{
 			return;
 		}
-		string parentName = System.IO.Path.GetFileName(dir);
-		if (parentName == "녹음" || string.Equals(parentName, "Recordings", StringComparison.OrdinalIgnoreCase))
+		if (IsRecordingFolderName(System.IO.Path.GetFileName(dir)))
 		{
 			dir = System.IO.Path.GetDirectoryName(dir) ?? dir;
 		}
-		string[] audioExts = new string[7] { ".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac", ".opus" };
-		List<string> versions = Directory.EnumerateFiles(dir).Where(f => audioExts.Contains(System.IO.Path.GetExtension(f).ToLower()) && !string.Equals(f, sourcePath, StringComparison.OrdinalIgnoreCase)).OrderBy(f => f).ToList();
-		string recDir = System.IO.Path.Combine(dir, "녹음");
-		List<string> recs = (Directory.Exists(recDir) ? Directory.EnumerateFiles(recDir).Where(f => audioExts.Contains(System.IO.Path.GetExtension(f).ToLower())).OrderByDescending(f => f).ToList() : new List<string>());
+		// Outside a per-song folder (e.g. an album folder) other files belong to other songs, so only same-song names are listed.
+		bool songFolder = IsSongFolder(dir);
+		string songBase = GetSongBaseName(sourcePath);
+		Func<string, bool> sameSong = (string f) => songFolder || string.Equals(GetSongBaseName(f), songBase, StringComparison.OrdinalIgnoreCase);
+		List<string> versions = Directory.EnumerateFiles(dir).Where(f => AudioExtensions.Contains(System.IO.Path.GetExtension(f).ToLower()) && !string.Equals(f, sourcePath, StringComparison.OrdinalIgnoreCase) && sameSong(f)).OrderBy(f => f).ToList();
+		List<string> recs = new List<string>();
+		string[] recDirNames = new string[2] { RecordingFolderName, "Recordings" };
+		foreach (string recDirName in recDirNames)
+		{
+			string recDir = System.IO.Path.Combine(dir, recDirName);
+			if (Directory.Exists(recDir))
+			{
+				recs.AddRange(Directory.EnumerateFiles(recDir).Where(f => AudioExtensions.Contains(System.IO.Path.GetExtension(f).ToLower()) && sameSong(f)));
+			}
+		}
+		recs = recs.OrderByDescending(f => System.IO.Path.GetFileName(f)).ToList();
 		ContextMenu menu = new ContextMenu();
 		MenuItem openItem = new MenuItem
 		{
@@ -2974,7 +3192,7 @@ public partial class MainWindow : Window
 				return null;
 			}
 			string baseName = System.IO.Path.GetFileNameWithoutExtension(sourcePath);
-			if (System.Text.RegularExpressions.Regex.IsMatch(baseName, "_(HQ|P[+-]?\\d+|T\\d+|Inst)($|_)"))
+			if (System.Text.RegularExpressions.Regex.IsMatch(baseName, "_(HQ|P[+-]?\\d+|T\\d+)($|_)"))
 			{
 				return null;
 			}
@@ -2990,7 +3208,7 @@ public partial class MainWindow : Window
 				foreach (string ext in exts)
 				{
 					string cand = System.IO.Path.Combine(dir, n + ext);
-					if (System.IO.File.Exists(cand))
+					if (System.IO.File.Exists(cand) && CanOpenForRead(cand))
 					{
 						return cand;
 					}
@@ -3339,6 +3557,7 @@ public partial class MainWindow : Window
 			{
 				LyricsBox.Text = "";
 			}
+			lyricsEditOriginal = LyricsBox.Text;
 			LyricsBox.IsReadOnly = false;
 			LyricsBox.Focus();
 			EditLyricsBtn.Content = "취소";
@@ -3350,39 +3569,49 @@ public partial class MainWindow : Window
 		}
 	}
 
-	private string? GetSharedLyricsPath(string audioPath)
+	private void AutoSavePendingLyricsEdit()
 	{
+		if (!lyricsEditMode || LyricsBox == null || string.IsNullOrEmpty(currentLyricsPath))
+		{
+			return;
+		}
+		string path = currentLyricsPath;
+		string text = LyricsBox.Text;
+		lyricsEditMode = false;
+		LyricsBox.IsReadOnly = true;
+		EditLyricsBtn.Content = S("편집", "Edit");
+		SaveLyricsBtn.IsEnabled = false;
+		if (text == lyricsEditOriginal)
+		{
+			return;
+		}
 		try
 		{
-			string dir = System.IO.Path.GetDirectoryName(audioPath);
-			if (dir == null)
+			string sharedPath = GetSharedLyricsPath(path);
+			if (sharedPath != null)
 			{
-				return null;
+				System.IO.File.WriteAllText(sharedPath, text, new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
+				return;
 			}
-			string parentName = System.IO.Path.GetFileName(dir);
-			if (parentName == "녹음" || string.Equals(parentName, "Recordings", StringComparison.OrdinalIgnoreCase))
-			{
-				dir = System.IO.Path.GetDirectoryName(dir);
-				if (dir == null)
-				{
-					return null;
-				}
-			}
-			if (string.IsNullOrEmpty(musicRootPath))
-			{
-				return null;
-			}
-			string rootTrim = musicRootPath.TrimEnd('\\', '/');
-			if (!dir.StartsWith(rootTrim + System.IO.Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-			{
-				return null;
-			}
-			return System.IO.Path.Combine(dir, "가사.txt");
+			// Caller must have closed the file (StopPlayback) before tag lyrics can be written.
+			using TagLib.File file = TagLib.File.Create(path);
+			file.Tag.Lyrics = text;
+			file.Save();
 		}
-		catch
+		catch (Exception ex)
+		{
+			MessageBox.Show(S("가사 자동 저장 실패: ", "Failed to auto-save lyrics: ") + ex.Message);
+		}
+	}
+
+	private string? GetSharedLyricsPath(string audioPath)
+	{
+		string dir = GetSongDirectory(audioPath);
+		if (dir == null || !IsSongFolder(dir))
 		{
 			return null;
 		}
+		return System.IO.Path.Combine(dir, "가사.txt");
 	}
 
 	private void SaveLyricsBtn_Click(object sender, RoutedEventArgs e)
@@ -3426,17 +3655,7 @@ public partial class MainWindow : Window
 			SaveLyricsBtn.IsEnabled = false;
 			if (num2 >= 0)
 			{
-				PlayTrack(num2);
-				if (audioFileReader != null && num > 0.0)
-				{
-					audioFileReader.CurrentTime = TimeSpan.FromSeconds(num);
-				}
-				if (!flag)
-				{
-					outputDevice?.Pause();
-					PlayPauseButton.Content = "▶";
-					progressTimer.Stop();
-				}
+				PlayTrack(num2, num, !flag);
 			}
 		}
 		catch (Exception ex)
@@ -3647,36 +3866,46 @@ public partial class MainWindow : Window
 		YtDownloadBtn.Content = S("다운로드 중...", "Downloading...");
 		try
 		{
-			string[] audioExts = new string[7] { ".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac", ".opus" };
-			HashSet<string> before = new HashSet<string>(from f in Directory.EnumerateFiles(savePath, "*.*", SearchOption.AllDirectories)
-				where audioExts.Contains(System.IO.Path.GetExtension(f).ToLower())
-				select f);
+			DateTime startedAt = DateTime.Now;
 			string args = BuildYtDlpArgs(text, fmt, savePath);
-			int exitCode = await Task.Run(() => RunYtDlp(ytdlp, args));
-			if (exitCode != 0)
+			(int exitCode, string output) result = await Task.Run(() => RunYtDlp(ytdlp, args));
+			if (result.exitCode != 0)
 			{
 				YtDownloadBtn.Content = S("yt-dlp 업데이트 중...", "Updating yt-dlp...");
-				bool updated = await Task.Run(() => RunYtDlp(ytdlp, "-U") == 0);
+				bool updated = await Task.Run(() => RunYtDlp(ytdlp, "-U").exitCode == 0);
 				if (updated)
 				{
 					YtDownloadBtn.Content = S("다시 시도 중...", "Retrying...");
-					exitCode = await Task.Run(() => RunYtDlp(ytdlp, args));
+					result = await Task.Run(() => RunYtDlp(ytdlp, args));
 				}
-				if (exitCode != 0)
+				if (result.exitCode != 0)
 				{
 					MessageBox.Show(S("다운로드 실패. URL을 확인해주세요.\n(yt-dlp 자동 업데이트 후에도 실패했습니다.)", "Download failed. Please check the URL.\n(Failed even after auto-updating yt-dlp.)"));
 					return;
 				}
 			}
-			List<string> list = (from f in Directory.EnumerateFiles(savePath, "*.*", SearchOption.AllDirectories)
-				where !before.Contains(f) && audioExts.Contains(System.IO.Path.GetExtension(f).ToLower())
-				select f).ToList();
+			List<string> list = (from line in result.output.Split(new char[2] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+				select line.Trim() into p
+				where p.Length > 0 && System.IO.File.Exists(p) && AudioExtensions.Contains(System.IO.Path.GetExtension(p).ToLower())
+				select System.IO.Path.GetFullPath(p)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+			if (list.Count == 0)
+			{
+				// Fallback only: everything in downloadedFiles becomes a cleanup (delete) candidate, so take just the newest match.
+				list = (await Task.Run(() => FindRecentDownloads(savePath, startedAt))).Take(1).ToList();
+			}
 			LibraryRefreshBtn_Click(this, new RoutedEventArgs());
 			downloadedFiles.AddRange(list.Where(f => !downloadedFiles.Contains(f)));
 			if (list.Count > 0)
 			{
 				AddToPlaylist(list[0]);
-				PlayTrack(playlist.Count - 1);
+				if (!isRecording)
+				{
+					int newIdx = playlist.IndexOf(list[0]);
+					if (newIdx >= 0)
+					{
+						PlayTrack(newIdx);
+					}
+				}
 				YtUrlBox.Clear();
 			}
 		}
@@ -3692,28 +3921,52 @@ public partial class MainWindow : Window
 		}
 	}
 
-	private static int RunYtDlp(string ytdlpPath, string args)
+	private static (int exitCode, string output) RunYtDlp(string ytdlpPath, string args)
 	{
 		try
 		{
-			using Process process = Process.Start(new ProcessStartInfo(ytdlpPath, args)
+			ProcessStartInfo psi = new ProcessStartInfo(ytdlpPath, args)
 			{
 				UseShellExecute = false,
 				CreateNoWindow = true,
 				RedirectStandardOutput = true,
-				RedirectStandardError = true
-			});
+				RedirectStandardError = true,
+				StandardOutputEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)
+			};
+			using Process process = Process.Start(psi);
 			process.ErrorDataReceived += delegate
 			{
 			};
 			process.BeginErrorReadLine();
-			process.StandardOutput.ReadToEnd();
+			string output = process.StandardOutput.ReadToEnd();
 			process.WaitForExit();
-			return process.ExitCode;
+			return (exitCode: process.ExitCode, output: output);
 		}
 		catch
 		{
-			return -1;
+			return (exitCode: -1, output: "");
+		}
+	}
+
+	private static List<string> FindRecentDownloads(string rootPath, DateTime startedAt)
+	{
+		EnumerationOptions options = new EnumerationOptions
+		{
+			IgnoreInaccessible = true,
+			RecurseSubdirectories = true,
+			MaxRecursionDepth = 1
+		};
+		DateTime threshold = startedAt.AddSeconds(-5.0);
+		try
+		{
+			return (from f in Directory.EnumerateFiles(rootPath, "*", options)
+				where AudioExtensions.Contains(System.IO.Path.GetExtension(f).ToLower()) && !IsRecordingFile(f) && !System.Text.RegularExpressions.Regex.IsMatch(System.IO.Path.GetFileNameWithoutExtension(f), "_(HQ|Inst|P[+-]?\\d+|T\\d+)($|_)") && System.IO.File.GetCreationTime(f) >= threshold
+				orderby System.IO.File.GetCreationTime(f) descending
+				select f).ToList();
+		}
+		catch
+		{
+			return new List<string>();
 		}
 	}
 
@@ -3761,6 +4014,9 @@ public partial class MainWindow : Window
 			(fmt == "mp3") ? "--audio-quality 320k" : "--audio-quality 0",
 			"--format \"" + text3 + "\"",
 			"-o \"" + text + "\"",
+			"--print after_move:filepath",
+			// Redirected stdout is otherwise written in the ANSI code page (PYTHONIOENCODING is ignored), mangling non-CP949 titles in the printed path.
+			"--encoding utf-8",
 			"--no-playlist",
 			"\"" + url + "\""
 		};
