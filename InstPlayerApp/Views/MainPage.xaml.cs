@@ -95,16 +95,13 @@ public partial class MainPage : ContentPage
         catch { }
     }
 
-    // 공유 인텐트 경유: 다이얼로그 없이 바로 다운로드 시작
+    // 공유 인텐트 경유: 다이얼로그 없이 바로 다운로드 (받는 중이면 대기열에 추가)
     private void StartYoutubeDownload(string url)
     {
-        if (_isOfferingDownload) return;
-        _vm.YoutubeUrl = url;
         _vm.ShowYoutube = true;
         _vm.ShowPlaylist = false;
         _vm.ShowLyrics = false;
-        if (_vm.DownloadYoutubeCommand.CanExecute(null))
-            _vm.DownloadYoutubeCommand.Execute(null);
+        _vm.EnqueueYoutubeDownload(url);
     }
 
     private async Task OfferYoutubeDownload(string url)
@@ -115,12 +112,7 @@ public partial class MainPage : ContentPage
         {
             bool ok = await DisplayAlert("유튜브 다운로드", "유튜브 주소가 감지되었습니다.\n다운로드할까요?", "다운로드", "취소");
             if (!ok) return;
-            _vm.YoutubeUrl = url;
-            _vm.ShowYoutube = true;
-            _vm.ShowPlaylist = false;
-            _vm.ShowLyrics = false;
-            if (_vm.DownloadYoutubeCommand.CanExecute(null))
-                _vm.DownloadYoutubeCommand.Execute(null);
+            StartYoutubeDownload(url);
         }
         finally
         {
@@ -128,14 +120,7 @@ public partial class MainPage : ContentPage
         }
     }
 
-    // "Video Title https://youtu.be/XXXXX" 형식에서 URL만 추출
-    private static string? ExtractYoutubeUrl(string text)
-    {
-        foreach (var part in text.Split(new[] { ' ', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries))
-            if (part.Contains("youtube.com/watch") || part.Contains("youtu.be/"))
-                return part;
-        return null;
-    }
+    private static string? ExtractYoutubeUrl(string text) => YoutubeLinks.Extract(text);
 
     protected override void OnSizeAllocated(double width, double height)
     {

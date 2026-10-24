@@ -34,5 +34,18 @@ public class PlaylistItem : INotifyPropertyChanged
         }
     }
 
+    // 지금 재생 중(또는 정지된 현재) 곡 — 선택(IsSelected)과 별개로 ▶ 표시
+    private bool _isCurrent;
+    public bool IsCurrent
+    {
+        get => _isCurrent;
+        set
+        {
+            if (_isCurrent == value) return;
+            _isCurrent = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsCurrent)));
+        }
+    }
+
     public event PropertyChangedEventHandler? PropertyChanged;
 }

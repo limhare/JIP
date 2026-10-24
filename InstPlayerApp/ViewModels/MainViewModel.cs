@@ -162,14 +162,29 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (_currentPlayingItem != null && _currentPlayingItem.FilePath == path) return;
         SaveCurrentLyrics();
         var item = Playlist.FirstOrDefault(p => p.FilePath == path);
-        _currentPlayingItem = item;
-        CurrentIndex = item != null ? Playlist.IndexOf(item) : -1;
+        SetCurrentItem(item);
         for (int i = 0; i < Playlist.Count; i++)
             Playlist[i].IsSelected = Playlist[i] == item;
         NowPlayingText = Path.GetFileNameWithoutExtension(path);
         LoadLyrics(path);
         RefreshPlayPauseIcon();
     }
+
+    // ── 현재 곡 / 선택 곡 ──
+    // 현재 곡: 재생 중이거나 정지된 채 로드돼 있는 곡 (▶ 표시, 다음/이전곡 기준)
+    // 선택 곡: 리스트에서 탭해 하이라이트한 곡 — 재생/내보내기/AI반주/녹음 등 작업 대상
+    private void SetCurrentItem(PlaylistItem? item)
+    {
+        if (_currentPlayingItem != null) _currentPlayingItem.IsCurrent = false;
+        _currentPlayingItem = item;
+        if (item != null) item.IsCurrent = true;
+        CurrentIndex = item != null ? Playlist.IndexOf(item) : -1;
+    }
+
+    /// <summary>작업 대상 곡: 선택한 곡, 없으면 현재 곡</summary>
+    private PlaylistItem? TargetItem =>
+        Playlist.FirstOrDefault(p => p.IsSelected)
+        ?? (CurrentIndex >= 0 && CurrentIndex < Playlist.Count ? Playlist[CurrentIndex] : null);
 
     public void StartTimer(IDispatcher dispatcher)
     {
@@ -261,8 +276,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void StopPlayback()
     {
+        // \uD604\uC7AC \uACE1 \uCC38\uC870\uB294 \uC720\uC9C0 \u2014 \uC815\uC9C0 \uD6C4 \uACE1\uC744 \uC9C0\uC6B0\uAC70\uB098 \uC21C\uC11C\uB97C \uBC14\uAFD4\uB3C4 CurrentIndex\uAC00 \uB530\uB77C\uAC00\uB3C4\uB85D
         _audio.Stop();
-        _currentPlayingItem = null;
         PlayPauseIcon = "\u25B6";
         ProgressValue = 0;
         CurrentTimeText = "0:00";
@@ -290,7 +305,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             int next;
             do { next = _rng.Next(Playlist.Count); } while (next == CurrentIndex);
-            _playHistory.Push(CurrentIndex);
+            if (CurrentIndex >= 0) _playHistory.Push(CurrentIndex);
             PlayTrack(next);
             return;
         }
@@ -304,8 +319,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         if (index < 0 || index >= Playlist.Count) return;
         SaveCurrentLyrics(); // 이전 곡 가사 저장
-        CurrentIndex = index;
-        // 재생 중인 트랙 하이라이트
+        // 재생을 시작하면 선택도 그 곡으로 맞춘다
         for (int i = 0; i < Playlist.Count; i++)
             Playlist[i].IsSelected = (i == index);
         _abPointA = TimeSpan.FromSeconds(-1);
@@ -317,7 +331,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         NotifyAbRects();
 
         var item = Playlist[index];
-        _currentPlayingItem = item; // 참조 저장 (리오더 시 인덱스 추적용)
+        SetCurrentItem(item); // 참조 저장 (리오더 시 인덱스 추적용) + ▶ 표시
         _audio.LoadAndPlay(item.FilePath);
         // 녹음 파일의 원키·원속도 재생은 엔진(Java)이 곡 전환 시 처리 — 여기선 사용자 값만 보낸다
         // (녹음 재생 때 0을 보내면 사용자 키가 0으로 덮여 다음 곡까지 원키로 나옴)
@@ -383,13 +397,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private async Task ExportMp3()
     {
         if (IsExporting) return;
-        if (CurrentIndex < 0 || CurrentIndex >= Playlist.Count)
+        var target = TargetItem; // 선택한 곡 (없으면 현재 곡)
+        if (target == null)
         {
-            await Shell.Current.DisplayAlert("MP3 내보내기", "재생 중인 파일이 없습니다.", "확인");
+            await Shell.Current.DisplayAlert("MP3 내보내기", "곡을 먼저 선택해주세요.", "확인");
             return;
         }
 
-        string inputPath = Playlist[CurrentIndex].FilePath;
+        string inputPath = target.FilePath;
         string baseName  = Path.GetFileNameWithoutExtension(inputPath);
         string pitchStr  = Pitch == 0 ? "" : $"_P{Pitch:+0;-0}";
         string tempoStr  = (int)Tempo == 0 ? "" : $"_T{100 + (int)Tempo}";
@@ -452,13 +467,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private async Task ExportMp3HQ()
     {
         if (IsExporting) return;
-        if (CurrentIndex < 0 || CurrentIndex >= Playlist.Count)
+        var target = TargetItem; // 선택한 곡 (없으면 현재 곡)
+        if (target == null)
         {
-            await Shell.Current.DisplayAlert("HQ 내보내기", "재생 중인 파일이 없습니다.", "확인");
+            await Shell.Current.DisplayAlert("HQ 내보내기", "곡을 먼저 선택해주세요.", "확인");
             return;
         }
 
-        string inputPath = Playlist[CurrentIndex].FilePath;
+        string inputPath = target.FilePath;
         string baseName  = Path.GetFileNameWithoutExtension(inputPath);
         string pitchStr  = Pitch == 0 ? "" : $"_P{Pitch:+0;-0}";
         string tempoStr  = (int)Tempo == 0 ? "" : $"_T{100 + (int)Tempo}";
@@ -647,12 +663,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
 #endif
     }
 
-    // 녹음 대상 곡: 재생 중인 곡 → 탭으로 선택된 곡 → 곡이 하나뿐이면 그 곡
+    // 녹음 대상 곡: 다른 작업과 같은 규칙 — 선택한 곡 → 현재 곡 → 곡이 하나뿐이면 그 곡
     private int ResolveRecordTargetIndex()
     {
-        if (CurrentIndex >= 0 && CurrentIndex < Playlist.Count) return CurrentIndex;
-        var sel = Playlist.FirstOrDefault(p => p.IsSelected);
-        if (sel != null) return Playlist.IndexOf(sel);
+        var target = TargetItem;
+        if (target != null) return Playlist.IndexOf(target);
         if (Playlist.Count == 1) return 0;
         return -1;
     }
@@ -1005,13 +1020,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private void RemoveTrack(PlaylistItem? item)
     {
         if (item == null) return;
-        bool wasPlaying = ReferenceEquals(item, _currentPlayingItem);
-        if (wasPlaying) SaveCurrentLyrics();
+        bool wasCurrent = ReferenceEquals(item, _currentPlayingItem);
+        if (wasCurrent) SaveCurrentLyrics();
         Playlist.Remove(item);
-        if (wasPlaying)
+        if (wasCurrent)
         {
             StopPlayback();
-            CurrentIndex = -1;
+            SetCurrentItem(null);
         }
     }
 
@@ -1366,6 +1381,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 YoutubeStatusText = $"다운로드 중... {p}%";
             });
             List<string> newFiles;
+            var swDl = System.Diagnostics.Stopwatch.StartNew();
+            Android.Util.Log.Info("JIP_DL", $"start: {url}");
             try
             {
                 newFiles = await dl.DownloadAsync(url, template, "m4a", prog);
@@ -1394,6 +1411,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                     .ToList());
             }
             if (newFiles.Count == 0) throw new Exception("다운로드된 파일을 찾을 수 없습니다.");
+            Android.Util.Log.Info("JIP_DL", $"done {swDl.Elapsed.TotalSeconds:F1}s: {string.Join(" | ", newFiles)} ({new FileInfo(newFiles[0]).Length / 1024}KB)");
 
             dlFinished = true;
             YoutubeProgress = 100;
@@ -1405,11 +1423,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
             }
             YoutubeUrl = "";
 
-            // PC와 동일하게: 받은 곡을 바로 재생 — 단, 녹음 중이면 끼어들지 않음
+            // 받은 곡을 바로 재생 — 단, 다른 곡을 듣는(부르는) 중이거나 녹음 중이면 끼어들지 않고 목록에만 추가
             int newIdx = -1;
             for (int i = 0; i < Playlist.Count; i++)
                 if (Playlist[i].FilePath == newFiles[0]) { newIdx = i; break; }
-            if (newIdx >= 0 && !IsRecording && !IsRecordSaving) PlayTrack(newIdx);
+            bool busy = IsRecording || IsRecordSaving || _audio.Status == PlaybackStatus.Playing;
+            if (newIdx >= 0 && !busy) PlayTrack(newIdx);
+            else if (newIdx >= 0) YoutubeStatusText = $"완료 (재생목록에 추가): {Path.GetFileName(newFiles[0])}";
 #else
             await Task.CompletedTask;
             throw new Exception("Android 전용");
@@ -1418,6 +1438,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         catch (Exception ex)
         {
             YoutubeStatusText = $"오류: {ex.GetType().Name}: {ex.Message}";
+#if ANDROID
+            Android.Util.Log.Warn("JIP_DL", $"failed: {ex}");
+#endif
         }
         finally
         {
@@ -1426,10 +1449,55 @@ public partial class MainViewModel : ObservableObject, IDisposable
 #if ANDROID
             if (serviceAcquired) ForegroundJobs.ReleaseWork();
 #endif
+            StartNextQueuedDownload();
         }
     }
 
     private bool CanDownload() => !IsDownloading;
+
+    // 받는 중에 들어온 공유는 버리지 않고 순서대로 받는다
+    private readonly Queue<string> _pendingDownloads = new();
+
+    public void EnqueueYoutubeDownload(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return;
+#if ANDROID
+        Android.Util.Log.Info("JIP_DL", $"enqueue (downloading={IsDownloading}, queued={_pendingDownloads.Count}): {url}");
+#endif
+        // 받는 중이거나 명령이 아직 끝나지 않았으면(CanExecute=false) 버리지 말고 대기열에
+        if (IsDownloading || !DownloadYoutubeCommand.CanExecute(null))
+        {
+            if (!_pendingDownloads.Contains(url))
+                _pendingDownloads.Enqueue(url);
+            YoutubeStatusText = $"대기열에 추가됨 (대기 {_pendingDownloads.Count}곡)";
+            return;
+        }
+        YoutubeUrl = url;
+        DownloadYoutubeCommand.Execute(null);
+    }
+
+    private void StartNextQueuedDownload()
+    {
+        if (_pendingDownloads.Count == 0) return;
+        // 지금 실행 중인 다운로드 명령이 완전히 끝난 뒤(CanExecute 복귀 후) 다음 곡 시작.
+        // BeginInvokeOnMainThread는 메인 스레드에서 즉시 실행되므로 짧게 지연시켜 넘긴다.
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(150);
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                if (_pendingDownloads.Count == 0 || IsDownloading) return;
+                if (!DownloadYoutubeCommand.CanExecute(null))
+                {
+                    StartNextQueuedDownload(); // 아직 끝나지 않음 — 다시 대기
+                    return;
+                }
+                var next = _pendingDownloads.Dequeue();
+                YoutubeUrl = next;
+                DownloadYoutubeCommand.Execute(null);
+            });
+        });
+    }
 
     // ── Natural End ──
 

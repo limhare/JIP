@@ -51,16 +51,7 @@ public class MainActivity : MauiAppCompatActivity
         if (intent?.Action != Intent.ActionSend || intent.Type != "text/plain") return;
         var text = intent.GetStringExtra(Intent.ExtraText)?.Trim();
         if (string.IsNullOrEmpty(text)) return;
-        var url = ExtractYoutubeUrl(text);
+        var url = YoutubeLinks.Extract(text);
         if (url != null) ShareReceiver.NotifyUrl(url);
-    }
-
-    // "Video Title https://youtu.be/XXXXX" 형식에서 URL만 추출
-    private static string? ExtractYoutubeUrl(string text)
-    {
-        foreach (var part in text.Split(new[] { ' ', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries))
-            if (part.Contains("youtube.com/watch") || part.Contains("youtu.be/"))
-                return part;
-        return null;
     }
 }

@@ -125,7 +125,7 @@
                                                        Invoked="OnSwipeDeleteTrack" />
                                         </SwipeItems>
                                     </SwipeView.RightItems>
-                                    <Grid Padding="12,10" Margin="0,2" ColumnDefinitions="*,Auto">
+                                    <Grid Padding="12,10" Margin="0,2" ColumnDefinitions="Auto,*,Auto">
                                         <Grid.Triggers>
                                             <DataTrigger TargetType="Grid" Binding="{Binding IsSelected}" Value="True">
                                                 <Setter Property="BackgroundColor" Value="#1A3A5C" />
@@ -138,9 +138,19 @@
                                             <TapGestureRecognizer Tapped="OnPlaylistItemTapped" NumberOfTapsRequired="1" />
                                             <TapGestureRecognizer Tapped="OnPlaylistItemDoubleTapped" NumberOfTapsRequired="2" />
                                         </Grid.GestureRecognizers>
-                                        <Label Grid.Column="0" Text="{Binding DisplayName}"
-                                               TextColor="#E1E1E1" FontSize="14" VerticalOptions="Center" />
-                                        <Label Grid.Column="1" Text="☰" TextColor="#666" FontSize="18"
+                                        <Label Grid.Column="0" Text="▶" TextColor="#4EC9B0" FontSize="12"
+                                               VerticalOptions="Center" Padding="0,0,6,0"
+                                               IsVisible="{Binding IsCurrent}" />
+                                        <Label Grid.Column="1" Text="{Binding DisplayName}"
+                                               TextColor="#E1E1E1" FontSize="14" VerticalOptions="Center">
+                                            <Label.Triggers>
+                                                <DataTrigger TargetType="Label" Binding="{Binding IsCurrent}" Value="True">
+                                                    <Setter Property="TextColor" Value="#4EC9B0" />
+                                                    <Setter Property="FontAttributes" Value="Bold" />
+                                                </DataTrigger>
+                                            </Label.Triggers>
+                                        </Label>
+                                        <Label Grid.Column="2" Text="☰" TextColor="#666" FontSize="18"
                                                VerticalOptions="Center" Padding="8,0,0,0" />
                                     </Grid>
                                 </SwipeView>
@@ -314,7 +324,7 @@
                                                        Invoked="OnSwipeDeleteTrack" />
                                         </SwipeItems>
                                     </SwipeView.RightItems>
-                                    <Grid Padding="12,10" Margin="0,2" ColumnDefinitions="*,Auto">
+                                    <Grid Padding="12,10" Margin="0,2" ColumnDefinitions="Auto,*,Auto">
                                         <Grid.Triggers>
                                             <DataTrigger TargetType="Grid" Binding="{Binding IsSelected}" Value="True">
                                                 <Setter Property="BackgroundColor" Value="#1A3A5C" />
@@ -327,9 +337,19 @@
                                             <TapGestureRecognizer Tapped="OnPlaylistItemTapped" NumberOfTapsRequired="1" />
                                             <TapGestureRecognizer Tapped="OnPlaylistItemDoubleTapped" NumberOfTapsRequired="2" />
                                         </Grid.GestureRecognizers>
-                                        <Label Grid.Column="0" Text="{Binding DisplayName}"
-                                               TextColor="#E1E1E1" FontSize="14" VerticalOptions="Center" />
-                                        <Label Grid.Column="1" Text="☰" TextColor="#666" FontSize="18"
+                                        <Label Grid.Column="0" Text="▶" TextColor="#4EC9B0" FontSize="12"
+                                               VerticalOptions="Center" Padding="0,0,6,0"
+                                               IsVisible="{Binding IsCurrent}" />
+                                        <Label Grid.Column="1" Text="{Binding DisplayName}"
+                                               TextColor="#E1E1E1" FontSize="14" VerticalOptions="Center">
+                                            <Label.Triggers>
+                                                <DataTrigger TargetType="Label" Binding="{Binding IsCurrent}" Value="True">
+                                                    <Setter Property="TextColor" Value="#4EC9B0" />
+                                                    <Setter Property="FontAttributes" Value="Bold" />
+                                                </DataTrigger>
+                                            </Label.Triggers>
+                                        </Label>
+                                        <Label Grid.Column="2" Text="☰" TextColor="#666" FontSize="18"
                                                VerticalOptions="Center" Padding="8,0,0,0" />
                                     </Grid>
                                 </SwipeView>
